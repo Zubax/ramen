@@ -1,0 +1,19 @@
+name: Style
+on: push
+env:
+  LLVM_VERSION: 19
+jobs:
+  style:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Check C++ formatting. We no longer use clang-format-lint-action because it is poorly maintained.
+      - name: Clang-Format  # language=bash
+        run: |
+          wget -O llvm.sh https://apt.llvm.org/llvm.sh
+          sudo bash llvm.sh $LLVM_VERSION
+          sudo apt-get -y install clang-format-$LLVM_VERSION
+          sudo ln -fs /usr/bin/clang-format-$LLVM_VERSION /usr/bin/clang-format
+          clang-format --version
+          clang-format --dry-run --Werror -fallback-style=none -style=file --verbose ramen/*.[ch]pp test/*.[ch]pp

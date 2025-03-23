@@ -1,0 +1,68 @@
+name: Verification
+on: [ push, pull_request ]
+env:
+  LLVM_VERSION: 19
+jobs:
+  verification:
+    runs-on: ubuntu-latest
+    # Run on push OR on 3rd-party PR.
+    # https://docs.github.com/en/webhooks/webhook-events-and-payloads?actionType=edited#pull_request
+    if: >
+      (github.event_name == 'push') ||
+      github.event.pull_request.head.repo.fork
+    strategy:
+      matrix:
+        # There shall be configurations with assertions enabled (no NDEBUG) and disabled to cover all cases.
+        cmake_build_type: [ Debug, Release ]
+        toolchain: [ clang, gcc ]
+        flags: [ '-m32', '-m64' ]
+        include:
+          - toolchain: gcc
+            cxx_compiler: g++
+          - toolchain: clang
+            cxx_compiler: clang++
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies # language=bash
+        run: |
+          wget -O llvm.sh https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh $LLVM_VERSION
+          sudo apt-get -y install gcc-multilib g++-multilib clang-tidy-$LLVM_VERSION
+          sudo ln -fs /usr/bin/clang-$LLVM_VERSION         /usr/bin/clang
+          sudo ln -fs /usr/bin/clang++-$LLVM_VERSION       /usr/bin/clang++
+          sudo ln -fs /usr/bin/clang-tidy-$LLVM_VERSION    /usr/bin/clang-tidy
+          clang      --version
+          clang++    --version
+          clang-tidy --version
+
+      - name: Run CMake # language=bash
+        run: >
+          cmake
+          -B ${{ github.workspace }}/build
+          -DCMAKE_BUILD_TYPE=${{          matrix.cmake_build_type }}
+          -DCMAKE_CXX_COMPILER=${{        matrix.cxx_compiler }}
+          -DCMAKE_CXX_FLAGS=${{           matrix.flags }}
+          -DCMAKE_EXE_LINKER_FLAGS=${{    matrix.flags }}
+
+      - name: Build all
+        working-directory: ${{github.workspace}}/build
+        run: make VERBOSE=1 -j$(nproc)
+
+      - name: Run all tests
+        working-directory: ${{github.workspace}}/build
+        run: make test ARGS="--verbose"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          # The matrix is shown for convenience but this is fragile because the values may not be string-convertible.
+          # Shall it break one day, feel free to remove the matrix from here.
+          # The job status is per matrix item, which is super convenient.
+          name: ${{github.job}}-#${{strategy.job-index}}-${{job.status}}-${{join(matrix.*, ',')}}
+          path: ${{github.workspace}}/
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 9
