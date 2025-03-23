@@ -12,6 +12,19 @@
 namespace
 {
 
+/// This emulates the case of Eigen matrix views, which must be bound to a matrix object upon construction.
+/// This is a very common use case in control systems and DSP, so this is a first-class use case.
+struct NonDefaultConstructible
+{
+    char& ref;
+    explicit NonDefaultConstructible(char& ref) : ref(ref) {}
+    NonDefaultConstructible(const NonDefaultConstructible&)            = delete;
+    NonDefaultConstructible(NonDefaultConstructible&&)                 = delete;
+    NonDefaultConstructible& operator=(const NonDefaultConstructible&) = delete;
+    NonDefaultConstructible& operator=(NonDefaultConstructible&&)      = delete;
+    ~NonDefaultConstructible()                                         = default;
+};
+
 TEST_CASE("pull")
 {
     using ramen::Pullable;
@@ -59,6 +72,22 @@ TEST_CASE("pull")
     REQUIRE(out_bhv_a);
     opt_in_evt_b.reset();
     REQUIRE(!out_bhv_a);  // All detached.
+}
+
+TEST_CASE("pull_non_default_constructible")
+{
+    using ramen::Pullable;
+    using ramen::Puller;
+    // ReSharper disable once CppParameterMayBeConstPtrOrRef
+    Pullable<NonDefaultConstructible> out_bhv = [](NonDefaultConstructible& x) { x.ref = 'a'; };
+    Puller<NonDefaultConstructible>   in_evt;
+    in_evt >> out_bhv;
+
+    char                    storage = '\0';  // This is like an ordinary Eigen matrix.
+    NonDefaultConstructible ndc{storage};    // And this is like a view of that matrix.
+    REQUIRE('\0' == storage);
+    in_evt(ndc);
+    REQUIRE('a' == storage);
 }
 
 TEST_CASE("push")
@@ -218,8 +247,8 @@ TEST_CASE("performance")
 
     std::cout << "Baseline: elapsed: " << elapsed_baseline << "; per iteration: " << elapsed_baseline / iterations
               << "\n";
-    std::cout << "OOP:      elapsed: " << elapsed_oop << " s; per iteration: " << elapsed_oop / iterations << "\n";
-    std::cout << "Actor:    elapsed: " << elapsed_actor << " s; per iteration: " << elapsed_actor / iterations << "\n";
+    std::cout << "OOP:      elapsed: " << elapsed_oop << "; per iteration: " << elapsed_oop / iterations << "\n";
+    std::cout << "Actor:    elapsed: " << elapsed_actor << "; per iteration: " << elapsed_actor / iterations << "\n";
     using D                            = std::chrono::duration<float>;
     const float slowdown_uncompensated = std::chrono::duration_cast<D>(elapsed_actor) /  //
                                          std::chrono::duration_cast<D>(elapsed_oop);
