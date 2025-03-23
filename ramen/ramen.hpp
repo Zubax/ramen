@@ -6,7 +6,7 @@
 /// `_| `_`_| |_|_|  |_|____/`_| `_/
 ///
 /// RAMEN (Real-time Actor-based Message Exchange Network) is a very compact single-header C++20+ dependency-free
-/// library that implements message passing for hard real-time mission-critical embedded systems.
+/// library that implements message-passing/flow-based programming for hard real-time mission-critical embedded systems.
 /// It is designed to be very low-overhead, efficient, and easy to use. Please refer to the README for the docs.
 ///
 /// The library includes the core functionality (the message passing ports) along with a few utilities for
