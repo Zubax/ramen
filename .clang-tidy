@@ -1,0 +1,35 @@
+# -clang-diagnostic-... cannot be given here because for some reason it is ignored unless given via CLI.
+Checks: >-
+  boost-*,
+  bugprone-*,
+  cert-*,
+  clang-analyzer-*,
+  cppcoreguidelines-*,
+  google-*,
+  hicpp-*,
+  llvm-*,
+  misc-*,
+  modernize-*,
+  performance-*,
+  portability-*,
+  readability-*,
+  -cppcoreguidelines-avoid-const-or-ref-data-members,
+  -cppcoreguidelines-avoid-do-while,
+  -google-readability-todo,
+  -readability-avoid-const-params-in-decls,
+  -llvm-header-guard,
+  -llvm-include-order,
+  -bugprone-easily-swappable-parameters,
+  -*-use-trailing-return-type,
+  -*-identifier-length,
+  -*-named-parameter,
+  -*-non-private-member-variables-in-classes,
+CheckOptions:
+  - key:   readability-magic-numbers.IgnoredIntegerValues
+    value: '1;2;3;4;5;8;10;16;20;32;60;64;100;128;256;500;512;1000'
+  # The include cleaner is only enabled for the standard library.
+  - key:   misc-include-cleaner.IgnoreHeaders
+    value: '^.+\.h(pp|\+\+|xx)?$'
+WarningsAsErrors: '*'
+HeaderFilterRegex: '.*\.hpp'
+FormatStyle: file

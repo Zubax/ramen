@@ -14,3 +14,7 @@ In theory, it should work on any conventional platform, from 8-bit to 64-bit; if
 ## Trade-offs
 
 Internally, each message passing invocation goes through two virtual method calls.
+
+## Development
+
+The `CMakeLists.txt` recipe is for development purposes only. Do not use in production.

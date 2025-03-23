@@ -1,15 +1,12 @@
-///
-///  _____          __  __ ______ _   _
-/// |  __ `   /`   |  `/  |  ____| ` | |
-/// | |__) | /  `  | `  / | |__  |  `| |
-/// |  _  / / /` ` | |`/| |  __| | . ` |
-/// | | ` `/ ____ `| |  | | |____| |`  |
-/// |_|  `_`/    `_`_|  |_|______|_| `_|
-///
-/// ===================================================================================================================
+/// ______  ___ ___  ________ _   _
+/// | ___ `/ _ `|  `/  |  ___| ` | |
+/// | |_/ / /_` ` .  . | |__ |  `| |
+/// |    /|  _  | |`/| |  __|| . ` |
+/// | |` `| | | | |  | | |___| |`  |
+/// `_| `_`_| |_|_|  |_|____/`_| `_/
 ///
 /// RAMEN (Real-time Actor-based Message Exchange Network) is a very compact single-header C++20+ dependency-free
-/// library that implements message-passing computation semantics for hard real-time mission-critical embedded systems.
+/// library that implements message passing for hard real-time mission-critical embedded systems.
 /// It is designed to be very low-overhead, efficient, and easy to use. Please refer to the README for the docs.
 ///
 /// The library includes the core functionality (the message passing ports) along with a few utilities for
@@ -118,13 +115,14 @@
 
 #include <array>
 #include <tuple>
+#include <utility>
 #include <cassert>
 #include <cstddef>
 #include <algorithm>
 #include <type_traits>
 
-#define RAMEN_VERSION_MAJOR 0
-#define RAMEN_VERSION_MINOR 1
+#define RAMEN_VERSION_MAJOR 0  // NOLINT(*-macro-*)
+#define RAMEN_VERSION_MINOR 1  // NOLINT(*-macro-*)
 
 namespace ramen
 {
@@ -143,7 +141,7 @@ template <typename, std::size_t footprint, std::size_t alignment = alignof(std::
 class Function;
 
 /// This type is used to change the default function footprint when needed.
-/// Refer to Pushable/Pullable etc for usage details.
+/// Refer to Pushable/Pullable etc. for usage details.
 template <std::size_t size>
 struct Footprint;
 
@@ -276,7 +274,7 @@ public:
         return *this;
     }
 
-    [[nodiscard]] R operator()(A... args) const final { return call_(fun_.data(), args...); }
+    [[nodiscard]] R operator()(A... args) const override { return call_(fun_.data(), args...); }
 
     ~Function() noexcept { destroy(); }  // This is not virtual because the class is final.
 
@@ -286,12 +284,10 @@ private:
     void construct(F&& fun) noexcept
     {
         assert(dtor_ == nullptr);
-        // NOSONARBEGIN reinterpret_cast, void*
-        // NOLINTBEGIN(cppcoreguidelines-pro-type-reinterpret-cast)
-        call_ = [](void* const ptr, A... args) -> R { return (*reinterpret_cast<T*>(ptr))(args...); };
-        dtor_ = [](void* const ptr) noexcept { reinterpret_cast<T*>(ptr)->~T(); };
-        move_ = [](void* const dst, void* const src) noexcept { new (dst) T(std::move(*reinterpret_cast<T*>(src))); };
-        // NOLINTEND(cppcoreguidelines-pro-type-reinterpret-cast)
+        // NOSONARBEGIN void*
+        call_ = [](void* const ptr, A... args) -> R { return (*static_cast<T*>(ptr))(args...); };
+        dtor_ = [](void* const ptr) noexcept { static_cast<T*>(ptr)->~T(); };
+        move_ = [](void* const dst, void* const src) noexcept { new (dst) T(std::move(*static_cast<T*>(src))); };
         // NOSONAREND
         static_assert((sizeof(T) <= footprint) && (alignof(T) <= alignment));
         (void) new (fun_.data()) T(std::forward<F>(fun));  // NOSONAR placement new does not allocate memory.
@@ -555,7 +551,7 @@ struct Behavior<R(A...), footprint, movable> : public detail::Port<detail::Trigg
 {
     template <typename F>
     requires((Function<R(A...), footprint>::template is_valid_target<F>) && (!std::is_same_v<F, Behavior>) )
-    Behavior(F&& fun) : fun_(std::forward<F>(fun))  // NOLINT(*-explicit-*) NOSONAR does not match on copy/move
+    explicit(false) Behavior(F&& fun) : fun_(std::forward<F>(fun))  // NOSONAR does not match on copy/move
     {
     }
     Behavior(const Behavior&)                = delete;
@@ -563,6 +559,7 @@ struct Behavior<R(A...), footprint, movable> : public detail::Port<detail::Trigg
     Behavior& operator=(const Behavior&)     = delete;
     Behavior& operator=(Behavior&&) noexcept = default;
 
+    // ReSharper disable once CppHidingFunction
     virtual ~Behavior() noexcept = default;
 
     /// Behaviors are NOT meant to be invoked directly except in very special cases.
@@ -907,7 +904,7 @@ struct PushUnary<Footprint<fp>, Out, In...>
 {
     template <typename F>
     requires std::is_invocable_r_v<Out, F, In...>  // NOLINTNEXTLINE(*-explicit-*)
-    PushUnary(F fun) :
+    explicit(false) PushUnary(F fun) :
         in(
             [this, fun_ = std::move(fun)](const In&... val)
             {
@@ -973,12 +970,12 @@ struct PullUnary<Footprint<fp>, Out, In...>
 {
     template <typename F>
     requires(std::is_invocable_r_v<Out, F, In...> && (sizeof...(In) > 0))
-    PullUnary(F&& fun) : PullUnary(std::forward<F>(fun), In{}...)  // NOLINT(*-explicit-*)
+    explicit(false) PullUnary(F&& fun) : PullUnary(std::forward<F>(fun), In{}...)
     {
     }
     template <typename F>
     requires std::is_invocable_r_v<Out, F, In...>
-    PullUnary(F fun, In... initial_values) :  // NOLINT(*-explicit-*)
+    explicit(false) PullUnary(F fun, In... initial_values) :
         value(std::move(initial_values)...),
         out(
             [this, fun_ = std::move(fun)](Out& val)
@@ -997,7 +994,7 @@ struct PullUnary<Footprint<fp>, Out, In>
 {
     template <typename F>
     requires std::is_invocable_r_v<Out, F, In>
-    PullUnary(F fun, In initial_value = {}) :  // NOLINT(*-explicit-*)
+    explicit(false) PullUnary(F fun, In initial_value = {}) :
         value(std::move(initial_value)),
         out(
             [this, fun_ = std::move(fun)](Out& val)
@@ -1055,12 +1052,12 @@ struct PullNary<Footprint<fp>, Out, In...>
 {
     template <typename F>
     requires(std::is_invocable_r_v<Out, F, In...> && (sizeof...(In) > 0))
-    PullNary(F&& fun) : PullNary(std::forward<F>(fun), In{}...)  // NOLINT(*-explicit-*)
+    explicit(false) PullNary(F&& fun) : PullNary(std::forward<F>(fun), In{}...)
     {
     }
     template <typename F>
     requires std::is_invocable_r_v<Out, F, In...>
-    PullNary(F fun, In... initial_values) :  // NOLINT(*-explicit-*)
+    explicit(false) PullNary(F fun, In... initial_values) :
         value(std::move(initial_values)...),
         out(
             [this, fun_ = std::move(fun)](Out& val)
@@ -1115,7 +1112,7 @@ struct Ctor final
 {
     template <typename F>
     requires std::is_invocable_r_v<void, F>
-    Ctor(F&& fun)  // NOLINT(*-explicit-*)  NOSONAR does not match on copy/move due to the concept requirement.
+    explicit(false) Ctor(F&& fun)  // NOSONAR does not match on copy/move due to the concept requirement.
     {
         std::forward<F>(fun)();
     }
@@ -1131,7 +1128,7 @@ struct Ctor final
 ///     Finalizer<sizeof(void*)> fin_ = [field = this->field]{ ... };
 /// While it is valid to capture this, it breaks if the object is moved, because the lambda will still capture the
 /// original object, which may no longer exist at the old address. See https://stackoverflow.com/q/78937332/1007777
-template <std::size_t footprint = sizeof(void*) * 8>
+template <std::size_t footprint = sizeof(void*) * 10>
 class Finalizer final
 {
 public:
@@ -1141,7 +1138,7 @@ public:
 
     template <typename F>
     requires(Fun::template is_valid_target<F>)
-    Finalizer(F&& action) noexcept :  // NOLINT(*-explicit-*) NOSONAR does not match on copy/move
+    explicit(false) Finalizer(F&& action) noexcept :  // NOSONAR does not match on copy/move
         act_(std::forward<F>(action))
     {
     }
