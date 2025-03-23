@@ -123,6 +123,9 @@
 #include <algorithm>
 #include <type_traits>
 
+#define RAMEN_VERSION_MAJOR 0
+#define RAMEN_VERSION_MINOR 1
+
 namespace ramen
 {
 /// An invokable entity with the specified function signature.
