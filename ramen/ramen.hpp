@@ -66,16 +66,16 @@
 /// from an actor whose internal state is inconsistent. To avoid this class of errors, state updates should
 /// always be performed in a transactional manner: first, all inputs are read, then the state is updated, and only
 /// then the outputs are written. This is a general rule of thumb for designing such systems and is not specific
-/// to this library.
+/// to this library. Improper design can cause an infinite recursion with a subsequent stack overflow and a segfault.
 ///
 /// Pushable and Pusher accept const references to the passed data. It is not possible to pass non-const
 /// references nor rvalue references because the data may be passed through a chain of actors, and it is necessary
 /// to guarantee that each will receive the exact same data regardless of the order in which the actors are invoked.
 ///
 /// Puller and Pullable accept mutable references to the data because the data is returned via out-parameters.
-/// This is necessary to support the use case when the source of the data does not know the size of
-/// the returned data statically and at the same time the use of the dynamic memory is not allowed. One specific case
-/// where this situation arises is Eigen::MatrixRef<> with at least one dynamic dimension.
+/// This is necessary to support the use case when the output type can only be assigned inside a port behavior,
+/// but not constructed.
+/// One practical case where this situation arises is returning Eigen::MatrixRef<> with at least one dynamic dimension.
 ///
 /// Defining ports of highly specialized types is possible but rarely useful because specialized types impair
 /// composability. For example, suppose there is a specialized configuration struct for some actor. The actor could
