@@ -19,6 +19,7 @@ Checks: >-
   -readability-avoid-const-params-in-decls,
   -readability-function-cognitive-complexity,
   -readability-identifier-length,
+  -readability-redundant-member-init,
   -llvm-header-guard,
   -llvm-include-order,
   -bugprone-easily-swappable-parameters,
