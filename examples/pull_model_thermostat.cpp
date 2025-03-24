@@ -7,6 +7,7 @@
 #include <cmath>
 #include <numbers>
 #include <iostream>
+#include <optional>
 #include <thread>
 
 using Time        = std::chrono::nanoseconds;
@@ -83,7 +84,7 @@ struct ThermalModel
     ramen::Puller<Time>  in_time{};
 
     // BEHAVIORS
-    ramen::Pullable<float> out_temperature = [this](float& out)
+    ramen::Pullable<float> out_temperature_updated = [this](float& out)
     {
         // Compute the time delta.
         const Time  t = *in_time;
@@ -96,14 +97,16 @@ struct ThermalModel
         // Output the current temperature.
         out = temperature;
     };
+    // As above but it doesn't recompute the temperature.
+    ramen::Pullable<float> out_temperature_latest = [this](float& out) { out = temperature; };
 };
 
 int main()
 {
     // Instantiate the actors.
-    ThermalModel  plant{.temperature = 10, .heating_factor = 0.1F, .dissipation_factor = 0.05F};
-    Sinewave      commander{.freq = 0.1F, .amp = 10};
-    PidController controller{.gain_pi = {0.1F, 0.01F}, .integration_min_max = {-10, 10}};
+    ThermalModel  plant{.temperature = 0, .heating_factor = 0.5F, .dissipation_factor = 0.5F};
+    Sinewave      commander{.freq = 5.0F, .amp = 10};
+    PidController controller{.gain_pi = {0.1F, 0}, .integration_min_max = {-10, 10}};
 
     // Set up some additional ports we're going to need. We could create dedicated actors for this, too.
     // Source of the current time.
@@ -124,15 +127,16 @@ int main()
     time_to_seconds.in >> controller.in_time >> plant.in_time >> now;
     commander.input >> time_to_seconds.out;
     controller.in_setpoint >> commander.output;
-    output_temperature >> controller.in_process_variable >> plant.out_temperature;
+    controller.in_process_variable >> plant.out_temperature_latest;
+    output_temperature >> plant.out_temperature_updated;
     plant.in_heat_source >> controller.out_effort;
     plant.in_environment_temperature >> environment_temperature.out;
 
     // Run the simulation by simply pulling the final output_temperature port.
     // Every time it is pulled, the entire network will be evaluated.
-    for (int i = 0; i < 100; i++)
+    for (int i = 0; i < 200; i++)
     {
-        std::cout << "Temperature: " << *output_temperature << "°C\n";
+        std::cout << *output_temperature << "\n";
         std::this_thread::sleep_for(10ms);
     }
 
