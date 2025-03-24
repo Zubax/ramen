@@ -3,7 +3,8 @@
 [![Verification](https://github.com/Zubax/ramen/actions/workflows/verification.yml/badge.svg)](https://github.com/Zubax/ramen/actions/workflows/verification.yml)
 [![Forum](https://img.shields.io/discourse/https/forum.zubax.com/users.svg?color=e00000)](https://forum.zubax.com)
 
-RAMEN is a very compact single-header C++20+ dependency-free library that implements message-passing/flow-based 
+RAMEN is a very compact single-header C++20+ dependency-free library that implements
+message-passing/[flow-based](https://en.wikipedia.org/wiki/Flow-based_programming)
 programming for hard real-time mission-critical embedded systems, as well as general-purpose applications.
 It is designed to be very low-overhead, efficient, and easy to use.
 
