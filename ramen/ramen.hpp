@@ -6,7 +6,7 @@
 /// `_| `_`_| |_|_|  |_|____/`_| `_/
 ///
 /// RAMEN (Real-time Actor-based Message Exchange Network) is a very compact single-header C++20+ dependency-free
-/// library that implements message passing for hard real-time mission-critical embedded systems.
+/// library that implements message-passing/flow-based programming for hard real-time mission-critical embedded systems.
 /// It is designed to be very low-overhead, efficient, and easy to use. Please refer to the README for the docs.
 ///
 /// The library includes the core functionality (the message passing ports) along with a few utilities for
@@ -16,41 +16,41 @@
 ///
 /// In diagrams, arrows represent the control flow direction: the pointed-to item is invoked by the pointing item.
 /// Actors accept data inputs from the left and output data to the right.
-/// A control input (the invoked item) is called a behavior, and a control output (like a callback) is a delegate.
+/// A control input (the invoked item) is called a behavior, and a control output is called an event.
 /// Overall this results in four possible combinations of input/output ports,
 /// which can be used to arrange two dataflow models -- push (eager) and pull (lazy):
 ///
 ///     Port kind       Control     Data    Alias
 ///     --------------------------------------------
 ///      in-behavior    in          in      Pushable
-///     out-delegate    out         out     Pusher
+///     out-event       out         out     Pusher
 ///     out-behavior    in          out     Pullable
-///      in-delegate    out         in      Puller
+///      in-event       out         in      Puller
 ///
 /// Pull-model ports pair naturally with other pull-model ports, and the same for push-model ports.
 /// To bridge push and pull models together, we use two basic components:
-/// Latch (with behaviors on either side) and Lift (with delegates on either side and an additional trigger behavior);
+/// Latch (with behaviors on either side) and Lift (with events on either side and an additional trigger behavior);
 /// they are defined below.
 ///
 /// The following diagramming notation is adopted:
 ///
 ///                                +--------+
-///   (input behavior) pushable -->|        |--> pusher (output delegate)
+///   (input behavior) pushable -->|        |--> pusher (output event)
 ///                                | Actor  |
-///   (input delegate) puller   <--|        |<-- pullable (output behavior)
+///      (input event) puller   <--|        |<-- pullable (output behavior)
 ///                                +--------+
 ///
 /// The type of exchanged data can be arbitrary and it is possible to exchange more than one object per port.
-/// Behaviors and Delegates can be linked together arbitrarily using operator>>; remember that the arrows point in the
-/// direction of the control flow, not data flow. Within an actor, a behavior may trigger some delegates;
-/// a delegate of an actor can trigger behaviors in other actors that it is linked to.
+/// Behaviors and Events can be linked together arbitrarily using operator>>; remember that the arrows point in the
+/// direction of the control flow, not data flow. Within an actor, a behavior may trigger some events;
+/// an event of an actor can trigger behaviors in other actors that it is linked to.
 /// In some scenarios, the direction of the control flow does not matter on a bigger scale,
-/// in which case one can use operator^ to link behaviors and delegates together irrespective of the control direction.
+/// in which case one can use operator^ to link behaviors and events together irrespective of the control direction.
 ///
-/// Delegates can be linked with behaviors and other delegates into topics. Given multiple delegates on a topic,
-/// the resulting behavior is that any of the linked delegates will cause all linked behaviors to be triggered in
-/// the order of linking. Topics that do not contain behaviors have no effect (delegates do not affect each other).
-/// Behaviors cannot be linked directly without delegates.
+/// Events can be linked with behaviors and other events into topics. Given multiple events on a topic,
+/// the resulting behavior is that any of the linked events will cause all linked behaviors to be triggered in
+/// the order of linking. Topics that do not contain behaviors have no effect (events do not affect each other).
+/// Behaviors cannot be linked directly without events.
 ///
 /// Actors are usually implemented as structs with all data fields public. Public data does not hinder
 /// encapsulation because actors are unable to affect or even see each other's data directly, as all interation is
@@ -60,35 +60,35 @@
 /// (whether it's a good practice to define such mixed classes is another matter).
 ///
 /// Remember that recursive dependencies are common in actor networks, especially when they are used to implement
-/// control systems. When implementing an actor, keep in mind that triggering any delegate to push or pull data can
+/// control systems. When implementing an actor, keep in mind that triggering any event to push or pull data can
 /// cause the control flow to loop back to the current actor through a possibly very long chain of interactions.
 /// Proper design should prevent the possibility of descending into an infinite recursion and also serving data
-/// from an actor whose internal state is inconsistent. To avoid the latter class of errors, state updates should
+/// from an actor whose internal state is inconsistent. To avoid this class of errors, state updates should
 /// always be performed in a transactional manner: first, all inputs are read, then the state is updated, and only
 /// then the outputs are written. This is a general rule of thumb for designing such systems and is not specific
-/// to this library.
+/// to this library. Improper design can cause an infinite recursion with a subsequent stack overflow and a segfault.
 ///
 /// Pushable and Pusher accept const references to the passed data. It is not possible to pass non-const
 /// references nor rvalue references because the data may be passed through a chain of actors, and it is necessary
 /// to guarantee that each will receive the exact same data regardless of the order in which the actors are invoked.
 ///
 /// Puller and Pullable accept mutable references to the data because the data is returned via out-parameters.
-/// This is necessary to support the use case when the source of the data does not know the size of
-/// the returned data statically and at the same time the use of the dynamic memory is not allowed. One specific case
-/// where this situation arises is Eigen::MatrixRef<> with at least one dynamic dimension.
+/// This is necessary to support the use case when the output type can only be assigned inside a port behavior,
+/// but not constructed.
+/// One practical case where this situation arises is returning Eigen::MatrixRef<> with at least one dynamic dimension.
 ///
 /// Defining ports of highly specialized types is possible but rarely useful because specialized types impair
 /// composability. For example, suppose there is a specialized configuration struct for some actor. The actor could
 /// accept the configuration via an in-port and it would work, but the utility of this choice is limited because
 /// in order to make use of this port, the other actor would need to have access to its specific type, at which point
 /// the message passing aspect becomes redundant, as it would be easier to just pass/alter the configuration struct
-/// directly (e.g., by mutating the state of the first actor). However, the first actor were to accept configuration
+/// directly (e.g., by mutating the state of the first actor). Instead, if the first actor were to accept configuration
 /// via more granular in-ports of more generic types, like vectors, matrices, or whatever is common in the application,
 /// then the composability of the solution would not be compromised.
 ///
 /// Message passing enables a new approach to policy-based design. It is possible to ship predefined policies with
 /// an actor by defining several behaviors, each implementing its own policy while sharing the same type.
-/// The client will then choose which particular behavior to link with their own delegates.
+/// The client will then choose which particular behavior (policy) to use at the time when the network is linked.
 ///
 /// ===================================================================================================================
 ///
@@ -151,8 +151,8 @@ constexpr std::size_t default_behavior_footprint = std::max({sizeof(void(std::tu
                                                              sizeof(void (*)())});
 
 /// A behavior is a control input that is used either for pulling or pushing data. It contains a user-defined
-/// function that can be linked with other behaviors and delegates into a multicast call chain.
-/// A group of behaviors and delegates linked together form a topic.
+/// function that can be linked with other behaviors and events into a multicast call chain.
+/// A group of behaviors and events linked together form a topic.
 ///
 /// ATTENTION: If the lambda captures `this`, the entire object should be non-copyable and non-movable;
 /// otherwise, the captured this pointer will be dangling after moving, or point to the wrong object after copying.
@@ -162,12 +162,12 @@ constexpr std::size_t default_behavior_footprint = std::max({sizeof(void(std::tu
 template <typename, std::size_t footprint, bool movable = false>
 struct Behavior;
 
-/// A delegate is a control output that is used either for pulling or pushing data. It is an interface for invoking
-/// behaviors that belong to the same topic. By themselves, delegates have no effect when triggered until linked
+/// An event is a control output that is used either for pulling or pushing data. It is an interface for invoking
+/// behaviors that belong to the same topic. By themselves, events have no effect when triggered until linked
 /// with at least one behavior.
-/// An attempt to link a delegate or a behavior to the same topic more than once has no effect.
+/// An attempt to link an event or a behavior to the same topic more than once has no effect.
 template <typename>
-struct Delegate;
+struct Event;
 
 // ====================================================================================================================
 
@@ -563,8 +563,8 @@ struct Behavior<R(A...), footprint, movable> : public detail::Port<detail::Trigg
     virtual ~Behavior() noexcept = default;
 
     /// Behaviors are NOT meant to be invoked directly except in very special cases.
-    /// The normal usage pattern is to link them up with delegates and other behaviors into topics,
-    /// and then trigger topics via delegates as needed.
+    /// The normal usage pattern is to link them up with events and other behaviors into topics,
+    /// and then trigger topics via events as needed.
     ///
     /// In certain special cases, however, one may want to invoke a behavior directly; this is how it is done.
     /// The direct invocation is slow (linear complexity of the number of items in the topic).
@@ -575,12 +575,12 @@ struct Behavior<R(A...), footprint, movable> : public detail::Port<detail::Trigg
     [[nodiscard]] R operator()(A... args)
     {
         // One might be tempted to simply rewind the list to the beginning and trigger the first item on it,
-        // because the list is sorted such that the delegates are in the beginning. This won't work if there are no
+        // because the list is sorted such that the events are in the beginning. This won't work if there are no
         // behaviors on this topic, though. The current implementation is a bit slower but is robust.
         // We could add a special case for unlinked behaviors, though: if (!*this) { return trigger(args...); }
-        Delegate<R(A...)> delegate;  // The delegate will be destroyed and unlinked at the end.
-        delegate >> *this;
-        return delegate(args...);
+        Event<R(A...)> ev;  // The event will be destroyed and unlinked at the end.
+        ev >> *this;
+        return ev(args...);
     }
 
 private:
@@ -588,7 +588,7 @@ private:
     {
         // We know the concrete type of fun and its operator() is final, so there is no virtual call overhead:
         // the call will be inlined. In the end, the entire invocation chain is as follows:
-        // the delegate polymorphically calls this->trigger, which inlines the call to fun_(), which then invokes
+        // the event polymorphically calls this->trigger, which inlines the call to fun_(), which then invokes
         // a pointer to the target function; the target function can be inlined into that invoker.
         return fun_(args...);
     }
@@ -599,30 +599,30 @@ private:
 };
 
 template <typename... A>
-struct Delegate<void(A...)> : public detail::Port<detail::Triggerable<void(A...)>>
+struct Event<void(A...)> : public detail::Port<detail::Triggerable<void(A...)>>
 {
     using Port = detail::Port<detail::Triggerable<void(A...)>>;
 
-    /// A delegate is true if it is linked with anything, false otherwise.
-    /// Some actors may choose to skip computations associated with unlinked delegates to reduce the execution time.
+    /// An event is true if it is linked with anything, false otherwise.
+    /// Some actors may choose to skip computations associated with unlinked events to reduce the execution time.
     using Port::operator bool;
     using Port::operator!;
 
-    Delegate() noexcept                      = default;
-    Delegate(const Delegate&)                = delete;
-    Delegate(Delegate&&) noexcept            = default;
-    Delegate& operator=(const Delegate&)     = delete;
-    Delegate& operator=(Delegate&&) noexcept = default;
+    Event() noexcept                   = default;
+    Event(const Event&)                = delete;
+    Event(Event&&) noexcept            = default;
+    Event& operator=(const Event&)     = delete;
+    Event& operator=(Event&&) noexcept = default;
 
-    /// Links this delegate with a behavior or another delegate such that when any delegate on the topic is triggered,
+    /// Links this event with a behavior or another event such that when any event on the topic is triggered,
     /// all linked behaviors will be triggered, too.
     /// The order of linking is important: the linked behaviors will be triggered in the order of linking.
     /// If the other is already a member of another topic, the topics will be merged.
     /// The time complexity of this operation is linear of the number of elements in the topic afterward;
     /// the design is optimized to move the computational cost from the runtime invocation stage to the linking stage.
-    Delegate& operator>>(Port& that)
+    Event& operator>>(Port& that)
     {
-        // Delegates are inserted in the beginning of the topic, while behaviors go to the end. This is needed to
+        // Events are inserted in the beginning of the topic, while behaviors go to the end. This is needed to
         // avoid rewinding the list to the beginning when commencing topic execution. Since we can effectively join
         // two topics together at any moment, we have to sort the linked list after every insertion.
         this->merge(&that);
@@ -632,11 +632,11 @@ struct Delegate<void(A...)> : public detail::Port<detail::Triggerable<void(A...)
 
     void operator()(A... args) const
     {
-        // The list is kept sorted such that the delegates are in the beginning. This allows us to start traversal from
+        // The list is kept sorted such that the events are in the beginning. This allows us to start traversal from
         // the next (!) node without the need to rewind first; at the same time we can skip some of the initial
-        // delegates. A more interesting design would keep two independent linked lists: a list of ports and a list of
+        // events. A more interesting design would keep two independent linked lists: a list of ports and a list of
         // behaviors. This will remove unnecessary calls to the empty trigger() function if there is more than one
-        // delegate on the topic.
+        // event on the topic.
         detail::ListNode<detail::Triggerable<void(A...)>>* p = this->next();
         while (p != nullptr)
         {
@@ -645,43 +645,43 @@ struct Delegate<void(A...)> : public detail::Port<detail::Triggerable<void(A...)
         }
     }
 
-    /// Removes this delegate from the topic; undoes the effect of operator>>.
+    /// Removes this event from the topic; undoes the effect of operator>>.
     void detach() noexcept { this->remove(); }
 
-    virtual ~Delegate() noexcept = default;
+    virtual ~Event() noexcept = default;
 
 private:
     using Fun = void(A...);
 
     void trigger(A...) const final
     {
-        // This is a no-op because delegates do not have a direct execution behavior. This approach would not work in
+        // This is a no-op because events do not have a direct execution behavior. This approach would not work in
         // the case of a non-void return type; there, a slightly more sophisticated handling is needed. Perhaps the
-        // delegate does not need to be Triggerable at all, nor exist on the same hierarchy level as behaviors.
+        // event does not need to be Triggerable at all, nor exist on the same hierarchy level as behaviors.
         // This can be redesigned in the future without altering the user interface.
     }
 
     [[nodiscard]] std::size_t key() const noexcept final { return 0; }
 
-    /// This operator is a trivial wrapper over Delegate::operator>> used as a convenience helper when one doesn't
+    /// This operator is a trivial wrapper over Event::operator>> used as a convenience helper when one doesn't
     /// care about the direction of the control flow and just needs to link two or more ports together.
     /// The operator can be chained like in1^in2^out1^out2.
     /// This operator is chosen because it looks like an arrow that points neither left nor right, and also because
     /// it is used very infrequently.
-    friend Delegate& operator^(Delegate& le, detail::Port<detail::Triggerable<Fun>>& ri) noexcept { return le >> ri; }
-    friend Delegate& operator^(detail::Port<detail::Triggerable<Fun>>& le, Delegate& ri) noexcept { return ri >> le; }
-    // This overload is only needed to avoid the ambiguity when both arguments are delegates.
-    friend Delegate& operator^(Delegate& le, Delegate& ri) noexcept { return le >> ri; }
+    friend Event& operator^(Event& le, detail::Port<detail::Triggerable<Fun>>& ri) noexcept { return le >> ri; }
+    friend Event& operator^(detail::Port<detail::Triggerable<Fun>>& le, Event& ri) noexcept { return ri >> le; }
+    // This overload is only needed to avoid the ambiguity when both arguments are events.
+    friend Event& operator^(Event& le, Event& ri) noexcept { return le >> ri; }
 };
-/// Delegates with non-void return type are not supported.
+/// Events with non-void return type are not supported.
 /// The support can be added without much trouble but right now there doesn't seem to be an apparent use case for that.
 template <typename R, typename... A>
-struct Delegate<R(A...)>;
+struct Event<R(A...)>;
 
 // ====================================================================================================================
 
 /// A pushable is an in-behavior, which represents an input port for the push model.
-/// It sources the value from one or more of the connected out-delegates.
+/// It sources the value from one or more of the connected out-events.
 ///
 ///        +--------+
 ///     -->| actor  |
@@ -721,9 +721,9 @@ struct Pushable<Footprint<fp>, void> final : public Behavior<void(), fp>
     using Behavior<void(), fp>::Behavior;
 };
 
-/// A Pusher is an out-delegate, which represents an output port for the push model.
+/// A Pusher is an out-event, which represents an output port for the push model.
 /// It supplies the value to one or more of the connected in-behaviors.
-/// Multiple out-delegates can be used on the same topic with one or more in-behaviors without affecting each other.
+/// Multiple out-events can be used on the same topic with one or more in-behaviors without affecting each other.
 ///
 ///        +--------+
 ///        | actor  |-->
@@ -732,20 +732,20 @@ struct Pushable<Footprint<fp>, void> final : public Behavior<void(), fp>
 /// The void specialization is introduced for generality when T is deduced from some function return type:
 /// Pusher<> and Pusher<void> are equivalent.
 template <typename... T>
-struct Pusher final : public Delegate<void(const T&...)>
+struct Pusher final : public Event<void(const T&...)>
 {
-    using Delegate<void(const T&...)>::operator();
-    using Delegate<void(const T&...)>::operator>>;
+    using Event<void(const T&...)>::operator();
+    using Event<void(const T&...)>::operator>>;
 };
 template <>
-struct Pusher<void> final : public Delegate<void()>
+struct Pusher<void> final : public Event<void()>
 {
-    using Delegate<void()>::operator();
-    using Delegate<void()>::operator>>;
+    using Event<void()>::operator();
+    using Event<void()>::operator>>;
 };
 
 /// A Pullable is an out-behavior, which represents an output port for the pull model.
-/// It supplies the value to one or more of the connected in-delegates.
+/// It supplies the value to one or more of the connected in-events.
 ///
 ///        +--------+
 ///        | actor  |<--
@@ -770,9 +770,9 @@ struct Pullable<Footprint<fp>, T...> final : public Behavior<void(T&...), fp>
     using Behavior<void(T&...), fp>::Behavior;
 };
 
-/// A Puller is an in-delegate, which represents an input port for the pull model.
+/// A Puller is an in-event, which represents an input port for the pull model.
 /// It sources the value from one or more of the connected out-behaviors.
-/// Multiple in-delegates can be used on the same topic with one or more out-behaviors without affecting each other.
+/// Multiple in-events can be used on the same topic with one or more out-behaviors without affecting each other.
 ///
 ///        +--------+
 ///     <--| actor  |
@@ -781,18 +781,18 @@ struct Pullable<Footprint<fp>, T...> final : public Behavior<void(T&...), fp>
 /// The void specialization is introduced for generality when T is deduced from some function return type:
 /// Pusher<> and Pusher<void> are equivalent.
 template <typename... T>
-struct Puller final : public Delegate<void(T&...)>
+struct Puller final : public Event<void(T&...)>
 {
-    using Delegate<void(T&...)>::operator();
-    using Delegate<void(T&...)>::operator>>;
+    using Event<void(T&...)>::operator();
+    using Event<void(T&...)>::operator>>;
 };
 /// The specialization for a single default-constructible T is equipped with fancy helpers.
 template <typename T>
 requires std::is_default_constructible_v<T>
-struct Puller<T> final : public Delegate<void(T&)>
+struct Puller<T> final : public Event<void(T&)>
 {
-    using Delegate<void(T&)>::operator();
-    using Delegate<void(T&)>::operator>>;
+    using Event<void(T&)>::operator();
+    using Event<void(T&)>::operator>>;
     /// A fancy helper for sourcing the value.
     T operator*() const
     {
@@ -813,10 +813,10 @@ struct Puller<T> final : public Delegate<void(T&)>
     }
 };
 template <>
-struct Puller<void> final : public Delegate<void()>
+struct Puller<void> final : public Event<void()>
 {
-    using Delegate<void()>::operator();
-    using Delegate<void()>::operator>>;
+    using Event::operator();
+    using Event::operator>>;
 };
 
 // ====================================================================================================================
@@ -831,7 +831,7 @@ struct Puller<void> final : public Delegate<void()>
 ///                               |       |
 ///                               +-------+
 ///
-/// As it has to expose a push-input and a pull-output, it has behaviors on both sides and no delegates.
+/// As it has to expose a push-input and a pull-output, it has behaviors on both sides and no events.
 /// The Latch has a default value that is written on push and read on pop; it can be changed by the user as well.
 ///
 /// Do not use Latch to define actor ports; actors usually should only provide {Push,Pull}{able,er} ports.
@@ -852,13 +852,13 @@ struct Latch
 ///
 ///                                +-------+
 ///                           (T)  |       |  (Out)
-///     (input delegate) puller <--| Lift  |--> pusher (output delegate)
+///        (input event) puller <--| Lift  |--> pusher (output event)
 ///                            ()  |       |
 ///   (input behavior) pushable -->|       |
 ///                                |       |
 ///                                +-------+
 ///
-/// As it has to expose a pull-input and a push-output, it has delegates on both sides.
+/// As it has to expose a pull-input and a push-output, it has events on both sides.
 /// Since the pull-input is lazy, it has to receive an external trigger to pull the input and then push it out;
 /// this is done via an empty input behavior.
 template <typename T, typename Out = T>
@@ -885,7 +885,7 @@ struct Lift
 ///
 ///                                +-----------+
 ///                        (In...) |           |  (Out)
-///   (input behavior) pushable -->| PushUnary |--> pusher (output delegate)
+///   (input behavior) pushable -->| PushUnary |--> pusher (output event)
 ///                                |           |
 ///                                +-----------+
 ///
@@ -937,7 +937,7 @@ struct PushUnary : public PushUnary<Footprint<default_behavior_footprint>, Out, 
 ///
 ///                                 +-----------+
 ///                         (In...) |           |  (Out)
-///      (input delegate) puller <--| PullUnary |<-- pullable (output behavior)
+///         (input event) puller <--| PullUnary |<-- pullable (output behavior)
 ///                                 |           |
 ///                                 +-----------+
 ///
@@ -1021,13 +1021,13 @@ struct PullUnary : public PullUnary<Footprint<default_behavior_footprint>, Out, 
 ///
 ///                                 +-----------+
 ///                        (In_0)   |           |
-///    (input delegate) puller_0 <--|           |
+///       (input event) puller_0 <--|           |
 ///                                 |           |
 ///                        (In_1)   |           |  (Out)
-///    (input delegate) puller_1 <--| PullNary  |<-- pullable (output behavior)
+///       (input event) puller_1 <--| PullNary  |<-- pullable (output behavior)
 ///                                 |           |
 ///                        (In_n)   |           |
-///    (input delegate) puller_n <--|           |
+///       (input event) puller_n <--|           |
 ///                                 |           |
 ///                                 +-----------+
 ///
@@ -1081,7 +1081,7 @@ struct PullNary : public PullNary<Footprint<default_behavior_footprint>, Out, In
 // ====================================================================================================================
 
 /// Casts the input from From to To on every push using static_cast. This is a special case of PushUnary.
-/// 'To' can be void, which means that the out-delegate will be called without arguments.
+/// 'To' can be void, which means that the out-event will be called without arguments.
 template <typename To, typename From>
 struct PushCast final : public PushUnary<Footprint<sizeof([] {})>, To, From>
 {
@@ -1103,7 +1103,7 @@ struct PullCast final : public PullUnary<Footprint<sizeof([] {})>, To, From>
 /// The passed lambda is not stored anywhere, so it has an empty footprint (esp. if [[no_unique_address]] is used).
 /// Usage:
 ///
-///     struct my_actor
+///     struct MyActor
 ///     {
 ///         // ...fields...
 ///         Ctor _ = [this]{ ...initialization code... };

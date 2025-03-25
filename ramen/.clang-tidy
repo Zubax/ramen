@@ -1,4 +1,4 @@
-InheritParentConfig: true
+# -clang-diagnostic-... cannot be given here because for some reason it is ignored unless given via CLI.
 Checks: >-
   boost-*,
   bugprone-*,
@@ -17,22 +17,19 @@ Checks: >-
   -cppcoreguidelines-avoid-do-while,
   -google-readability-todo,
   -readability-avoid-const-params-in-decls,
-  -readability-function-cognitive-complexity,
-  -readability-identifier-length,
   -llvm-header-guard,
   -llvm-include-order,
   -bugprone-easily-swappable-parameters,
-  -cert-err58-cpp,
-  -cert-msc30-c,
-  -cert-msc50-cpp,
-  -*-magic-numbers,
-  -*-owning-*,
-  -*-array-to-pointer-decay,
-  -*-array-decay,
   -*-use-trailing-return-type,
-  -*-pro-type-union-access,
+  -*-identifier-length,
   -*-named-parameter,
-  -*-unchecked-optional-access,
-  -*-include-cleaner,
   -*-non-private-member-variables-in-classes,
-  -*-use-designated-initializers,
+CheckOptions:
+  - key:   readability-magic-numbers.IgnoredIntegerValues
+    value: '1;2;3;4;5;8;10;16;20;32;60;64;100;128;256;500;512;1000'
+  # The include cleaner is only enabled for the standard library.
+  - key:   misc-include-cleaner.IgnoreHeaders
+    value: '^.+\.h(pp|\+\+|xx)?$'
+WarningsAsErrors: '*'
+HeaderFilterRegex: '.*\.hpp'
+FormatStyle: file
