@@ -82,7 +82,7 @@
 /// accept the configuration via an in-port and it would work, but the utility of this choice is limited because
 /// in order to make use of this port, the other actor would need to have access to its specific type, at which point
 /// the message passing aspect becomes redundant, as it would be easier to just pass/alter the configuration struct
-/// directly (e.g., by mutating the state of the first actor). However, the first actor were to accept configuration
+/// directly (e.g., by mutating the state of the first actor). Instead, if the first actor were to accept configuration
 /// via more granular in-ports of more generic types, like vectors, matrices, or whatever is common in the application,
 /// then the composability of the solution would not be compromised.
 ///
