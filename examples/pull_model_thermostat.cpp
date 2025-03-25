@@ -1,6 +1,8 @@
 /// Public domain dedication: RAMEN usage example by Pavel Kirienko <pavel.kirienko@zubax.com> is marked with CC0 1.0.
 ///
 /// In this example we simulate a simple thermostat system with a PID controller that tracks a sinewave setpoint.
+/// We are using the pull model, meaning that the outputs are computed when they are requested; this can also be
+/// referred to as the lazy model.
 
 #include <ramen.hpp>
 #include <chrono>
@@ -41,6 +43,7 @@ struct PidController
 
     // BEHAVIORS
     // This is where the actual logic of the actor is implemented.
+    // Pulling the output causes the controller to pull the setpoint and the process variable.
     ramen::Pullable<float> out_effort = [this](float& out)
     {
         // First, compute the time delta by subtracting the previous time from the current time.
@@ -104,9 +107,11 @@ struct ThermalModel
 int main()
 {
     // Instantiate the actors.
-    ThermalModel  plant{.temperature = 0, .heating_factor = 0.5F, .dissipation_factor = 0.5F};
-    Sinewave      commander{.freq = 5.0F, .amp = 10};
-    PidController controller{.gain_pi = {0.1F, 0}, .integration_min_max = {-10, 10}};
+    ThermalModel  plant{.temperature = 0, .heating_factor = 0.1F, .dissipation_factor = 0.1F};
+    Sinewave      commander{.freq = 1.0F, .amp = 10};
+    PidController controller{.gain_pi = {100, 10}, .integration_min_max = {-100, 100}};
+
+    // ----------------------------------------------------------------------------------------------------------------
 
     // Set up some additional ports we're going to need. We could create dedicated actors for this, too.
     // Source of the current time.
@@ -123,7 +128,9 @@ int main()
     // A simple constant value.
     ramen::Latch<float> environment_temperature{3};
 
-    // Build the network. The arrows in the operator>> represent the direction of the control flow, not data flow.
+    // ----------------------------------------------------------------------------------------------------------------
+
+    // Link the network. The arrows in the operator>> represent the direction of the control flow, not data flow.
     time_to_seconds.in >> controller.in_time >> plant.in_time >> now;
     commander.input >> time_to_seconds.out;
     controller.in_setpoint >> commander.output;
@@ -131,6 +138,8 @@ int main()
     output_temperature >> plant.out_temperature_updated;
     plant.in_heat_source >> controller.out_effort;
     plant.in_environment_temperature >> environment_temperature.out;
+
+    // ----------------------------------------------------------------------------------------------------------------
 
     // Run the simulation by simply pulling the final output_temperature port.
     // Every time it is pulled, the entire network will be evaluated.

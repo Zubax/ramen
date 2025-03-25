@@ -608,7 +608,7 @@ struct Event<void(A...)> : public detail::Port<detail::Triggerable<void(A...)>>
     using Port::operator bool;
     using Port::operator!;
 
-    Event() noexcept                      = default;
+    Event() noexcept                   = default;
     Event(const Event&)                = delete;
     Event(Event&&) noexcept            = default;
     Event& operator=(const Event&)     = delete;
