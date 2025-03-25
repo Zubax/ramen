@@ -123,7 +123,7 @@ struct ThermalModel
     ramen::Pushable<float> in_environment_temperature = [this](const float x) { environment_temperature = x; };
 };
 
-int main()
+int main()  // NOLINT(bugprone-exception-escape)
 {
     // Instantiate the actors.
     ThermalModel  plant{.temperature = 0, .heating_factor = 0.1F, .dissipation_factor = 0.1F};
