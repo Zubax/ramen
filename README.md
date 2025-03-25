@@ -258,6 +258,12 @@ computation process, while the other inputs only quickly mutate some internal st
 For example, in a PID controller, the process variable input would normally trigger the computation of a
 new control effort output, while the setpoint input would just quickly update the internal state.
 
+To remove an event from whatever topic it is currently attached to, if any, call `.detach()`.
+Both events and behaviors are automatically detached on destruction, so there is no risk of dangling references.
+If an event or a behavior is already connected to a topic, and then it is connected to a member of another topic,
+both topics will be joined into one.
+Attaching a port to the same topic more than once has no effect and is safe.
+
 Actors are usually implemented as structs with all data fields public, although it is not a requirement.
 Public data does not hinder encapsulation because actors are unable to affect or even see each other's members directly,
 as all interaction is done through message passing.
