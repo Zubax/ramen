@@ -1,8 +1,8 @@
 /// Public domain dedication: RAMEN usage example by Pavel Kirienko <pavel.kirienko@zubax.com> is marked with CC0 1.0.
 ///
 /// In this example we simulate a simple thermostat system with a PID controller that tracks a sinewave setpoint.
-/// We are using the pull model, meaning that the outputs are computed when they are requested; this can also be
-/// referred to as the lazy model.
+/// Here, we are using the pull model, meaning that the outputs are computed when they are requested; this can also be
+/// referred to as the lazy model. Compare it to the push model counterpart.
 
 #include <ramen.hpp>
 #include <chrono>
@@ -18,6 +18,19 @@ using namespace std::chrono_literals;
 
 /// An ordinary parallel PID controller using the pull model (lazy evaluation).
 /// The result is computed when the output is pulled. The inputs are pulled from the connected actors when needed.
+/// The conventional diagram notation is as follows: data inputs on the left, data outputs on the right;
+/// arrows represent the control flow direction.
+///
+///                                  ┌───────────────┐
+///                          (float) │ PidController │ (float)
+///             in_setpoint ◄────────┤               │◄──────── out_effort
+///                                  │               │
+///                          (float) │               │
+///     in_process_variable ◄────────┤               │
+///                                  │               │
+///                           (Time) │               │
+///                 in_time ◄────────┤               │
+///                                  └───────────────┘
 struct PidController
 {
     // PRIVATE ACTOR STATES
@@ -27,7 +40,7 @@ struct PidController
     // items can be kept public because actors do not see each other directly; instead, they interact strictly via
     // events and behaviors. This is a key feature of flow-based programming that enables the composability of actors.
     //
-    // As a positive side effect, the fact that the fields are public enables the use of aggregate initialization.
+    // As a positive side effect, public fields enable aggregate initialization.
     std::array<float, 2> gain_pi{0, 0};
     std::array<float, 2> integration_min_max{0, 0};
     float                integral{0};
@@ -61,6 +74,11 @@ struct PidController
 };
 
 /// This node will be used as the setpoint source. It generates a sinewave with the specified parameters.
+///
+///                            ┌──────────┐
+///                    (float) │ Sinewave │ (float)
+///             input ◄────────┤          │◄──────── output
+///                            └──────────┘
 struct Sinewave
 {
     float freq{1};
@@ -73,6 +91,17 @@ struct Sinewave
 };
 
 /// A very basic thermal system with a heat source and an environment that sinks the heat.
+///
+///                                         ┌──────────────┐
+///                                 (float) │ ThermalModel │ (float)
+///                 in_heat_source ◄────────┤              │◄──────── out_temperature_updated
+///                                         │              │
+///                                 (float) │              │ (float)
+///     in_environment_temperature ◄────────┤              │◄──────── out_temperature_latest
+///                                         │              │
+///                                  (Time) │              │
+///                        in_time ◄────────┤              │
+///                                         └──────────────┘
 struct ThermalModel
 {
     // INTERNAL STATES

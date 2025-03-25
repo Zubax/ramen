@@ -815,8 +815,8 @@ struct Puller<T> final : public Event<void(T&)>
 template <>
 struct Puller<void> final : public Event<void()>
 {
-    using Event<void()>::operator();
-    using Event<void()>::operator>>;
+    using Event::operator();
+    using Event::operator>>;
 };
 
 // ====================================================================================================================
@@ -1103,7 +1103,7 @@ struct PullCast final : public PullUnary<Footprint<sizeof([] {})>, To, From>
 /// The passed lambda is not stored anywhere, so it has an empty footprint (esp. if [[no_unique_address]] is used).
 /// Usage:
 ///
-///     struct my_actor
+///     struct MyActor
 ///     {
 ///         // ...fields...
 ///         Ctor _ = [this]{ ...initialization code... };
