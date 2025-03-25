@@ -416,7 +416,7 @@ struct DQFrameSynchronousMachine final
 
 **🎓 For complete examples, refer to the `examples/` directory 📖**
 
-## Caveats
+## Considerations
 
 Avoid recursive data dependencies. Sometimes, it may be useful to slap a `Latch` or a `Lift` onto an existing
 network to break a circular data dependency.
@@ -426,6 +426,9 @@ This is not a lot, but needs to be kept in mind.
 
 You can mix pull- and push-model in a single actor, but doing so uncontrollably may result in a spaghetti design
 that is hard to comprehend.
+
+The [Olga Scheduler](https://github.com/Zubax/olga_scheduler) is a simple EDF scheduler for embedded systems
+that will work well with RAMEN.
 
 ## Development 🧑‍💻
 
