@@ -88,7 +88,7 @@
 ///
 /// Message passing enables a new approach to policy-based design. It is possible to ship predefined policies with
 /// an actor by defining several behaviors, each implementing its own policy while sharing the same type.
-/// The client will then choose which particular behavior to link with their own events.
+/// The client will then choose which particular behavior (policy) to use at the time when the network is linked.
 ///
 /// ===================================================================================================================
 ///

@@ -1,7 +1,7 @@
 /// Public domain dedication: RAMEN usage example by Pavel Kirienko <pavel.kirienko@zubax.com> is marked with CC0 1.0.
 ///
 /// A demo implementation of Peter Naur's "telegram problem" using RAMEN push model (eager computation).
-/// The task is to accept lines of text and generate output line containing as many words as possible,
+/// The task is to accept blocks of text and generate output lines, each containing as many words as possible,
 /// where the number of characters in each line does not exceed a certain limit.
 
 #include <ramen.hpp>
