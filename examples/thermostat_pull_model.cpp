@@ -133,7 +133,7 @@ struct ThermalModel
     ramen::Pullable<float> out_temperature_latest = [this](float& out) { out = temperature; };
 };
 
-int main()
+int main()  // NOLINT(bugprone-exception-escape)
 {
     // Instantiate the actors.
     ThermalModel  plant{.temperature = 0, .heating_factor = 0.1F, .dissipation_factor = 0.1F};

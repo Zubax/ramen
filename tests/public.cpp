@@ -8,6 +8,7 @@
 #include <cstdlib>
 #include <optional>
 #include <iostream>
+#include <random>
 
 namespace
 {
@@ -157,12 +158,14 @@ TEST_CASE("performance")
     using ramen::Pullable;
     using ramen::Puller;
 
-    const bool              choice     = (std::rand() % 2) == 0;
+    std::random_device entropy{};
+
+    const bool              choice     = (entropy() % 2) == 0;
     constexpr std::uint32_t iterations = 30'000'000;
     static constexpr float  magic      = 1e-5F;
     float                   y          = 0;  // This is an artificial data dependency to constrain the optimization.
 
-    const auto reset_y = [&y] { y = 1.0F / static_cast<float>((std::rand() % 0xFF'FF'FF) + 1); };
+    const auto reset_y = [&y, &entropy] { y = 1.0F / static_cast<float>((entropy() % 0xFF'FF'FF) + 1); };
 
     // OOP reference for comparison. Different implementations and dummy data to avoid devirtualization and inlining.
     using Base = Callable<void(float&)>;
@@ -245,10 +248,12 @@ TEST_CASE("performance")
         std::cout << "Final value: " << x << "\n";  // Explicit data dependency to constrain optimization
     }
 
-    std::cout << "Baseline: elapsed: " << elapsed_baseline << "; per iteration: " << elapsed_baseline / iterations
-              << "\n";
-    std::cout << "OOP:      elapsed: " << elapsed_oop << "; per iteration: " << elapsed_oop / iterations << "\n";
-    std::cout << "Actor:    elapsed: " << elapsed_actor << "; per iteration: " << elapsed_actor / iterations << "\n";
+    std::cout << "Baseline: elapsed: " << elapsed_baseline.count()
+              << "; per iteration: " << (elapsed_baseline / iterations).count() << "\n";
+    std::cout << "OOP:      elapsed: " << elapsed_oop.count()
+              << "; per iteration: " << (elapsed_oop / iterations).count() << "\n";
+    std::cout << "Actor:    elapsed: " << elapsed_actor.count()
+              << "; per iteration: " << (elapsed_actor / iterations).count() << "\n";
     using D                            = std::chrono::duration<float>;
     const float slowdown_uncompensated = std::chrono::duration_cast<D>(elapsed_actor) /  //
                                          std::chrono::duration_cast<D>(elapsed_oop);

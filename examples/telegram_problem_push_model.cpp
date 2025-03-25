@@ -119,7 +119,7 @@ toolset in order to be able to “wire together” these software ICs. At the ve
 able to choose the wiring language independent of the chip language.
 )===";
 
-int main()
+int main()  // NOLINT(bugprone-exception-escape)
 {
     // Instantiate the actors.
     Decomposer     decomposer;
