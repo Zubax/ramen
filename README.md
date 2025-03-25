@@ -17,6 +17,8 @@ It should work on any conventional platform, from 8-bit to 64-bit; if you find t
 
 ...
 
+`std::variant` can be used to pass distinct message types via the same link, which may occasionally be useful.
+
 ## Development 🧑‍💻
 
 The `CMakeLists.txt` recipe is for development purposes only. Do not use in production.
