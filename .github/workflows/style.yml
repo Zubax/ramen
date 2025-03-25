@@ -16,4 +16,5 @@ jobs:
           sudo apt-get -y install clang-format-$LLVM_VERSION
           sudo ln -fs /usr/bin/clang-format-$LLVM_VERSION /usr/bin/clang-format
           clang-format --version
-          clang-format --dry-run --Werror -fallback-style=none -style=file --verbose ramen/*.[ch]pp test/*.[ch]pp
+          clang-format --dry-run --Werror -fallback-style=none -style=file --verbose \
+              ramen/*.[ch]pp tests/*.[ch]pp examples/*.[ch]pp
