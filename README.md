@@ -38,7 +38,7 @@ computational complexity on top of the user logic.
 
 ## Notation
 
-There are two way to arrange a dataflow:
+There are two ways to arrange dataflows:
 
 - **Push model:** an actor receives data together with control flow and performs evaluations *eagerly*, updating its
   outputs immediately, triggering dependent computations *downstream* from itself.
