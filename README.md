@@ -201,7 +201,7 @@ struct Summer
     ramen::Pusher<float> out_sum;
     ramen::Pushable<float> in_a = [this](const float x) { a = x; };
     ramen::Pushable<float> in_b = [this](const float x) { b = x; };
-    ramen::Pushable<>   in_tick = [this](const float x) { out_sum(a + b); };  // often accepts time delta
+    ramen::Pushable<>   in_tick = [this] { out_sum(a + b); };  // often accepts time delta
 };
 ```
 
