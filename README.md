@@ -33,8 +33,8 @@ RAMEN allows one to apply dataflow programming in an extremely unopinionated way
 conventional C/C++ programs ad-hoc. It is implemented in only a few hundred lines of straightforward C++, plus a couple
 more hundred lines for some useful utilities that are nice to have in a dataflow program.
 
-RAMEN is typesafe, has no runtime error states, requires no heap, no exceptions, no RTTI, and adds no nontrivial
-computational complexity on top of the user logic.
+RAMEN is typesafe, has no runtime error states, requires no heap, no exceptions, no RTTI, no macros,
+and it adds no nontrivial computational complexity on top of the user logic.
 
 ## Notation
 
