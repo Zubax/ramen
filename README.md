@@ -77,7 +77,7 @@ with an arrow:
 
 ```
                     ┌───────┐
- (output data type) │ Actor │ (output data type)
+  (input data type) │ Actor │ (output data type)
   pushable ────────►│       ├────────► pusher
                     │       │
   (input data type) │       │ (output data type)
