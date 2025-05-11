@@ -1,7 +1,12 @@
-# Real-time Actor-based Message Exchange Network 🍜
+<h1 align="center" style="text-align:center">Real-time Actor-based Message Exchange Network 🍜</h1>
+<p align="center" style="text-align:center">Lightweight dataflow embedded programming in C++</p>
+<div align="center">
 
 [![Verification](https://github.com/Zubax/ramen/actions/workflows/verification.yml/badge.svg)](https://github.com/Zubax/ramen/actions/workflows/verification.yml)
 [![Forum](https://img.shields.io/discourse/https/forum.zubax.com/users.svg?color=e00000)](https://forum.zubax.com)
+
+</div>
+<hr/>
 
 RAMEN is a very compact, unopinionated, single-header C++20+ dependency-free library that implements
 message-passing/[flow-based](https://en.wikipedia.org/wiki/Flow-based_programming)
@@ -13,7 +18,7 @@ and you're ready to roll. Alternatively, add this repository as a submodule, and
 
 It should work on any conventional platform, from 8-bit to 64-bit; if you find this to be untrue, please open a ticket.
 
-## Why though?
+## Why though? 🧐
 
 There exists a class of problems in software engineering that are hard to model efficiently using more
 conventional paradigms, such as OOP, but are easy to describe using the dataflow model.
@@ -36,7 +41,7 @@ more hundred lines for some useful utilities that are nice to have in a dataflow
 RAMEN is typesafe, has no runtime error states, requires no heap, no exceptions, no RTTI, no macros,
 and it adds no nontrivial computational complexity on top of the user logic.
 
-## Notation
+## Notation 📐
 
 There are two ways to arrange dataflows:
 
@@ -85,7 +90,7 @@ with an arrow:
                     └───────┘
 ```
 
-## Dazzle me
+## Dazzle me 🤯
 
 Let's make a simple summation node using the pull model (lazy computation):
 
@@ -422,7 +427,7 @@ struct DQFrameSynchronousMachine final
 
 **🎓 For complete examples, refer to the `examples/` directory 📖**
 
-## Considerations
+## Considerations ⚠️
 
 Avoid recursive data dependencies. Sometimes, it may be useful to slap a `Latch` or a `Lift` onto an existing
 network to break a circular data dependency.
