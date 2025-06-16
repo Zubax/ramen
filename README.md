@@ -18,6 +18,8 @@ and you're ready to roll. Alternatively, add this repository as a submodule, and
 
 It should work on any conventional platform, from 8-bit to 64-bit; if you find this to be untrue, please open a ticket.
 
+RAMEN powers [Dyshlo](https://zubax.com/dyshlo) -- a powerful motor control and simulation library by Zubax Robotics.
+
 ## Why though? 🧐
 
 There exists a class of problems in software engineering that are hard to model efficiently using more
