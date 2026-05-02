@@ -22,7 +22,7 @@ jobs:
           - toolchain: clang
             cxx_compiler: clang++
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install dependencies # language=bash
         run: |
@@ -55,7 +55,7 @@ jobs:
         run: make test ARGS="--verbose"
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           # The matrix is shown for convenience but this is fragile because the values may not be string-convertible.

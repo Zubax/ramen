@@ -121,11 +121,10 @@
 #include <algorithm>
 #include <type_traits>
 
-#define RAMEN_VERSION_MAJOR 0  // NOLINT(*-macro-*)
-#define RAMEN_VERSION_MINOR 1  // NOLINT(*-macro-*)
+#define RAMEN_VERSION_MAJOR 0 // NOLINT(*-macro-*)
+#define RAMEN_VERSION_MINOR 1 // NOLINT(*-macro-*)
 
-namespace ramen
-{
+namespace ramen {
 /// An invokable entity with the specified function signature.
 template <typename>
 class Callable;
@@ -146,9 +145,9 @@ template <std::size_t size>
 struct Footprint;
 
 /// The default lambda footprint is enough to capture one pointer (e.g., this). If needed, it can be increased ad-hoc.
-constexpr std::size_t default_behavior_footprint = std::max({sizeof(void(std::tuple<>::*)()),  //
-                                                             sizeof(void*),
-                                                             sizeof(void (*)())});
+constexpr std::size_t default_behavior_footprint = std::max({ sizeof(void (std::tuple<>::*)()), //
+                                                              sizeof(void*),
+                                                              sizeof(void (*)()) });
 
 /// A behavior is a control input that is used either for pulling or pushing data. It contains a user-defined
 /// function that can be linked with other behaviors and events into a multicast call chain.
@@ -172,9 +171,8 @@ struct Event;
 // ====================================================================================================================
 
 template <typename R, typename... A>
-class Callable<R(A...)>
-{
-public:
+class Callable<R(A...)> {
+  public:
     template <typename F>
     constexpr static bool is_compatible = std::is_invocable_r_v<R, F, A...>;
 
@@ -186,89 +184,77 @@ public:
     Callable& operator=(const Callable&)     = default;
     Callable& operator=(Callable&&) noexcept = default;
 
-protected:
+  protected:
     ~Callable() noexcept = default;
 };
 
-namespace detail
-{
+namespace detail {
 template <typename Signature, std::size_t footprint, std::size_t alignment, typename Target>
-struct IsValidTarget : public std::false_type
-{
-};
+struct IsValidTarget : public std::false_type {};
 // A Function is never a valid target for another Function. We support assignment for that.
 template <typename X, typename Y, std::size_t a, std::size_t b, std::size_t c, std::size_t d>
-struct IsValidTarget<X, a, b, Function<Y, c, d>> : public std::false_type
-{
-};
+struct IsValidTarget<X, a, b, Function<Y, c, d>> : public std::false_type {};
 template <typename F, std::size_t fp, std::size_t al, typename T>
-requires((Callable<F>::template is_compatible<T>) && (sizeof(T) <= fp) && (alignof(T) <= al))
-struct IsValidTarget<F, fp, al, T> : public std::is_move_constructible<T>
-{
-};
-}  // namespace detail
+    requires((Callable<F>::template is_compatible<T>) && (sizeof(T) <= fp) && (alignof(T) <= al))
+struct IsValidTarget<F, fp, al, T> : public std::is_move_constructible<T> {};
+} // namespace detail
 
 template <typename R, typename... A, std::size_t footprint, std::size_t alignment>
-class Function<R(A...), footprint, alignment> final : public Callable<R(A...)>
-{
+class Function<R(A...), footprint, alignment> final : public Callable<R(A...)> {
     template <typename, std::size_t, std::size_t>
     friend class Function;
 
     static_assert((alignment & (alignment - 1)) == 0, "alignment must be a power of 2");
 
-public:
+  public:
     /// This function can be instantiated with any callable F for which this value is true.
     template <typename F, typename T = std::decay_t<F>>
     constexpr static bool is_valid_target = detail::IsValidTarget<R(A...), footprint, alignment, T>::value;
     /// Accepts a callable object and move-constructs it into the function.
     /// The new callable must meet is_valid_target; otherwise, this ctor does not participate in overload resolution.
     template <typename F>
-    requires is_valid_target<F>                 // NOLINTNEXTLINE(*-explicit-*)
-    explicit(false) Function(F&& fun) noexcept  // NOSONAR constraint is enforced by the requires clause
-    {
+        requires is_valid_target<F> // NOLINTNEXTLINE(*-explicit-*)
+    explicit(false) Function(F&& fun) noexcept {
         construct(std::forward<F>(fun));
     }
     Function(const Function& that) = delete;
-    Function(Function&& that) noexcept : call_(that.call_), dtor_(that.dtor_), move_(that.move_)
-    {
+    Function(Function&& that) noexcept
+      : call_(that.call_)
+      , dtor_(that.dtor_)
+      , move_(that.move_) {
         assert(move_ != nullptr);
         move_(fun_.data(), that.fun_.data());
     }
     template <std::size_t foot2, std::size_t align2>
-    requires(foot2 <= footprint) && (align2 <= alignment)
+        requires(foot2 <= footprint) && (align2 <= alignment)
     // NOLINTNEXTLINE(cppcoreguidelines-rvalue-reference-param-not-moved,*-explicit-*)
-    explicit(false) Function(Function<R(A...), foot2, align2>&& that) :
-        call_(that.call_),
-        dtor_(that.dtor_),
-        move_(that.move_)
-    {
+    explicit(false) Function(Function<R(A...), foot2, align2>&& that)
+      : call_(that.call_)
+      , dtor_(that.dtor_)
+      , move_(that.move_) {
         assert(move_ != nullptr);
         move_(fun_.data(), that.fun_.data());
     }
 
     Function& operator=(const Function& that) = delete;
-    Function& operator=(Function&& that) noexcept
-    {
-        if (this != &that)
-        {
+    Function& operator=(Function&& that) noexcept {
+        if (this != &that) {
             assign(std::move(that));
         }
         return *this;
     }
     template <std::size_t foot2, std::size_t align2>
-    requires(foot2 <= footprint) && (align2 <= alignment)
-    Function& operator=(Function<R(A...), foot2, align2>&& that) noexcept
-    {
+        requires(foot2 <= footprint) && (align2 <= alignment)
+    Function& operator=(Function<R(A...), foot2, align2>&& that) noexcept {
         assign(std::move(that));
         return *this;
     }
     /// Allows replacing the underlying callable object with a new one. The new callable must meet is_valid_target;
     /// otherwise, this operator does not participate in overload resolution.
     template <typename F>
-    requires is_valid_target<F>
+        requires is_valid_target<F>
     // NOLINTNEXTLINE(cppcoreguidelines-c-copy-assignment-signature,misc-unconventional-assign-operator)
-    Function& operator=(F&& fun) noexcept
-    {
+    Function& operator=(F&& fun) noexcept {
         destroy();
         construct(std::forward<F>(fun));
         return *this;
@@ -276,25 +262,21 @@ public:
 
     [[nodiscard]] R operator()(A... args) const override { return call_(fun_.data(), args...); }
 
-    ~Function() noexcept { destroy(); }  // This is not virtual because the class is final.
+    ~Function() noexcept { destroy(); } // This is not virtual because the class is final.
 
-private:
+  private:
     template <typename F, typename T = std::decay_t<F>>
-    requires is_valid_target<T>
-    void construct(F&& fun) noexcept
-    {
+        requires is_valid_target<T>
+    void construct(F&& fun) noexcept {
         assert(dtor_ == nullptr);
-        // NOSONARBEGIN void*
         call_ = [](void* const ptr, A... args) -> R { return (*static_cast<T*>(ptr))(args...); };
         dtor_ = [](void* const ptr) noexcept { static_cast<T*>(ptr)->~T(); };
         move_ = [](void* const dst, void* const src) noexcept { new (dst) T(std::move(*static_cast<T*>(src))); };
-        // NOSONAREND
         static_assert((sizeof(T) <= footprint) && (alignof(T) <= alignment));
-        (void) new (fun_.data()) T(std::forward<F>(fun));  // NOSONAR placement new does not allocate memory.
+        (void)new (fun_.data()) T(std::forward<F>(fun));
     }
 
-    void destroy() noexcept
-    {
+    void destroy() noexcept {
         assert(dtor_ != nullptr);
         dtor_(fun_.data());
         dtor_ = nullptr;
@@ -303,10 +285,9 @@ private:
     }
 
     template <std::size_t foot2, std::size_t align2>
-    requires(foot2 <= footprint) && (align2 <= alignment)
+        requires(foot2 <= footprint) && (align2 <= alignment)
     // NOLINTNEXTLINE(cppcoreguidelines-rvalue-reference-param-not-moved)
-    void assign(Function<R(A...), foot2, align2>&& that) noexcept
-    {
+    void assign(Function<R(A...), foot2, align2>&& that) noexcept {
         destroy();
         assert(dtor_ == nullptr);
         call_ = that.call_;
@@ -317,49 +298,39 @@ private:
     }
 
     alignas(alignment) mutable std::array<unsigned char, footprint> fun_;
-    // NOSONARBEGIN void*
     R (*call_)(void*, A...)              = nullptr;
     void (*dtor_)(void*) noexcept        = nullptr;
     void (*move_)(void*, void*) noexcept = nullptr;
-    // NOSONAREND
 };
 
 // ====================================================================================================================
-namespace detail
-{
+namespace detail {
 /// An ordinary double-linked list node.
 /// To use it, inherit from it and pass the base class as a template argument.
 template <typename T>
-class ListNode : public T
-{
-public:
+class ListNode : public T {
+  public:
     template <typename... Args>
-    requires((sizeof...(Args) != 1) ||  // Ensure this ctor doesn't match on copy/move.
-             (!std::is_same_v<ListNode, std::decay_t<std::tuple_element_t<0, std::tuple<Args...>>>>) )
-    explicit ListNode(Args&&... args) : T(std::forward<Args>(args)...)
-    {
-    }
+        requires((sizeof...(Args) != 1) || // Ensure this ctor doesn't match on copy/move.
+                 (!std::is_same_v<ListNode, std::decay_t<std::tuple_element_t<0, std::tuple<Args...>>>>))
+    explicit ListNode(Args&&... args)
+      : T(std::forward<Args>(args)...) {}
     template <typename Arg>
-    requires(!std::is_same_v<std::decay_t<Arg>, ListNode>)
-    explicit ListNode(Arg&& arg) : T(std::forward<Arg>(arg))
-    {
-    }
+        requires(!std::is_same_v<std::decay_t<Arg>, ListNode>)
+    explicit ListNode(Arg&& arg)
+      : T(std::forward<Arg>(arg)) {}
     ListNode(const ListNode&) = delete;
     ListNode(ListNode&& that) noexcept { operator=(std::move(that)); }
     ListNode& operator=(const ListNode&) = delete;
-    ListNode& operator=(ListNode&& that) noexcept
-    {
-        if (this != &that)
-        {
+    ListNode& operator=(ListNode&& that) noexcept {
+        if (this != &that) {
             remove();
             prev_ = that.prev_;
             next_ = that.next_;
-            if (prev_ != nullptr)
-            {
+            if (prev_ != nullptr) {
                 prev_->next_ = this;
             }
-            if (next_ != nullptr)
-            {
+            if (next_ != nullptr) {
                 next_->prev_ = this;
             }
             that.prev_ = nullptr;
@@ -370,20 +341,16 @@ public:
 
     [[nodiscard]] bool      linked() const noexcept { return (prev_ != nullptr) || (next_ != nullptr); }
     [[nodiscard]] ListNode* next() const noexcept { return next_; }
-    [[nodiscard]] ListNode* head() noexcept
-    {
+    [[nodiscard]] ListNode* head() noexcept {
         ListNode* p = this;
-        while (p->prev_ != nullptr)
-        {
+        while (p->prev_ != nullptr) {
             p = p->prev_;
         }
         return p;
     }
-    [[nodiscard]] ListNode* tail() noexcept
-    {
+    [[nodiscard]] ListNode* tail() noexcept {
         ListNode* p = this;
-        while (p->next_ != nullptr)
-        {
+        while (p->next_ != nullptr) {
             p = p->next_;
         }
         return p;
@@ -392,13 +359,10 @@ public:
     /// Merges two linked lists such that the list that contains "that" is appended to "this".
     /// Does nothing if this and that are already members of the same list (this is done through linear traversal).
     /// The time complexity is linear of the total number of elements in both lists.
-    void merge(ListNode* const that) noexcept
-    {
-        if (that != nullptr)
-        {
+    void merge(ListNode* const that) noexcept {
+        if (that != nullptr) {
             ListNode* const that_head = that->head();
-            if (this->head() != that_head)  // Also weeds out the case when this==that.
-            {
+            if (this->head() != that_head) { // Also weeds out the case when this==that.
                 ListNode* const this_tail = this->tail();
                 this_tail->next_          = that_head;
                 that_head->prev_          = this_tail;
@@ -413,23 +377,18 @@ public:
     /// The clustering key is an std::size_t value that is calculated by the key function.
     /// Behavior undefined if the key function returns a value that is out of the range [0, ClusterCount).
     template <std::size_t N, typename K>
-    requires std::is_invocable_r_v<std::size_t, K, const ListNode&>
-    void clusterize(const K& key) noexcept
-    {
+        requires std::is_invocable_r_v<std::size_t, K, const ListNode&>
+    void clusterize(const K& key) noexcept {
         // Make a single pass over the list, splitting it into several lists by clustering key.
         std::array<std::pair<ListNode*, ListNode*>, N> clusters{};
         ListNode*                                      p = this->head();
-        do
-        {
+        do {
             ListNode* const next = p->next_;
             p->remove();
-            if (std::pair<ListNode*, ListNode*>& c = clusters.at(key(*p)); c.first == nullptr)
-            {
+            if (std::pair<ListNode*, ListNode*>& c = clusters.at(key(*p)); c.first == nullptr) {
                 c.first  = p;
                 c.second = p;
-            }
-            else
-            {
+            } else {
                 assert((nullptr == c.first->prev_) && (nullptr == c.second->next_) && (nullptr == p->prev_));
                 c.second->next_ = p;
                 p->prev_        = c.second;
@@ -439,12 +398,9 @@ public:
         } while (p != nullptr);
         // Merge the lists back together.
         std::pair<ListNode*, ListNode*> x{};
-        for (const auto& c : clusters)
-        {
-            if (c.first != nullptr)  // Skip empty lists.
-            {
-                if (x.first != nullptr)
-                {
+        for (const auto& c : clusters) {
+            if (c.first != nullptr) { // Skip empty lists.
+                if (x.first != nullptr) {
                     x.second->next_ = c.first;
                     c.first->prev_  = x.second;
                     x.second        = c.second;
@@ -454,24 +410,21 @@ public:
         }
     }
 
-    void remove() noexcept
-    {
-        if (prev_ != nullptr)
-        {
+    void remove() noexcept {
+        if (prev_ != nullptr) {
             prev_->next_ = next_;
         }
-        if (next_ != nullptr)
-        {
+        if (next_ != nullptr) {
             next_->prev_ = prev_;
         }
         prev_ = nullptr;
         next_ = nullptr;
     }
 
-protected:
+  protected:
     ~ListNode() noexcept { remove(); }
 
-private:
+  private:
     ListNode* prev_ = nullptr;
     ListNode* next_ = nullptr;
 };
@@ -479,9 +432,8 @@ private:
 template <typename>
 class Triggerable;
 template <typename R, typename... A>
-class Triggerable<R(A...)>
-{
-public:
+class Triggerable<R(A...)> {
+  public:
     virtual R trigger(A... args) const = 0;
 
     [[nodiscard]] virtual std::size_t key() const noexcept = 0;
@@ -492,7 +444,7 @@ public:
     Triggerable& operator=(const Triggerable&)     = default;
     Triggerable& operator=(Triggerable&&) noexcept = default;
 
-protected:
+  protected:
     ~Triggerable() noexcept = default;
 };
 
@@ -500,8 +452,7 @@ protected:
 /// internal implementation details from T. Inheritors have to use public inheritance of this type because their
 /// references must be implicitly convertible into this type for topic linking.
 template <typename T>
-struct Port : protected ListNode<T>
-{
+struct Port : protected ListNode<T> {
     using ListNode<T>::linked;
 
     /// The operator bool shall be explicit to avoid unintentional conversions when using the linking operators
@@ -515,15 +466,14 @@ struct Port : protected ListNode<T>
     Port& operator=(const Port&)     = delete;
     Port& operator=(Port&&) noexcept = default;
 
-protected:
+  protected:
     ~Port() noexcept = default;
 };
 
 template <bool>
 struct EnableCopyMove;
 template <>
-struct EnableCopyMove<true>
-{
+struct EnableCopyMove<true> {
     EnableCopyMove() noexcept                            = default;
     EnableCopyMove(EnableCopyMove&&) noexcept            = default;
     EnableCopyMove(const EnableCopyMove&)                = default;
@@ -532,8 +482,7 @@ struct EnableCopyMove<true>
     ~EnableCopyMove() noexcept                           = default;
 };
 template <>
-struct EnableCopyMove<false>
-{
+struct EnableCopyMove<false> {
     EnableCopyMove() noexcept                            = default;
     EnableCopyMove(EnableCopyMove&&) noexcept            = delete;
     EnableCopyMove(const EnableCopyMove&)                = delete;
@@ -541,19 +490,17 @@ struct EnableCopyMove<false>
     EnableCopyMove& operator=(const EnableCopyMove&)     = delete;
     ~EnableCopyMove() noexcept                           = default;
 };
-}  // namespace detail
+} // namespace detail
 
 // ====================================================================================================================
 
 template <typename R, typename... A, std::size_t footprint, bool movable>
 struct Behavior<R(A...), footprint, movable> : public detail::Port<detail::Triggerable<R(A...)>>,
-                                               private detail::EnableCopyMove<movable>
-{
+                                               private detail::EnableCopyMove<movable> {
     template <typename F>
-    requires((Function<R(A...), footprint>::template is_valid_target<F>) && (!std::is_same_v<F, Behavior>) )
-    explicit(false) Behavior(F&& fun) : fun_(std::forward<F>(fun))  // NOSONAR does not match on copy/move
-    {
-    }
+        requires((Function<R(A...), footprint>::template is_valid_target<F>) && (!std::is_same_v<F, Behavior>))
+    explicit(false) Behavior(F&& fun)
+      : fun_(std::forward<F>(fun)) {}
     Behavior(const Behavior&)                = delete;
     Behavior(Behavior&&) noexcept            = default;
     Behavior& operator=(const Behavior&)     = delete;
@@ -572,20 +519,18 @@ struct Behavior<R(A...), footprint, movable> : public detail::Port<detail::Trigg
     /// objects need to be distributed to the actors once.
     ///
     /// Obviously, if the directly invoked behavior is a part of a topic, the entire topic will be triggered as well.
-    [[nodiscard]] R operator()(A... args)
-    {
+    [[nodiscard]] R operator()(A... args) {
         // One might be tempted to simply rewind the list to the beginning and trigger the first item on it,
         // because the list is sorted such that the events are in the beginning. This won't work if there are no
         // behaviors on this topic, though. The current implementation is a bit slower but is robust.
         // We could add a special case for unlinked behaviors, though: if (!*this) { return trigger(args...); }
-        Event<R(A...)> ev;  // The event will be destroyed and unlinked at the end.
+        Event<R(A...)> ev; // The event will be destroyed and unlinked at the end.
         ev >> *this;
         return ev(args...);
     }
 
-private:
-    R trigger(A... args) const final
-    {
+  private:
+    R trigger(A... args) const final {
         // We know the concrete type of fun and its operator() is final, so there is no virtual call overhead:
         // the call will be inlined. In the end, the entire invocation chain is as follows:
         // the event polymorphically calls this->trigger, which inlines the call to fun_(), which then invokes
@@ -599,8 +544,7 @@ private:
 };
 
 template <typename... A>
-struct Event<void(A...)> : public detail::Port<detail::Triggerable<void(A...)>>
-{
+struct Event<void(A...)> : public detail::Port<detail::Triggerable<void(A...)>> {
     using Port = detail::Port<detail::Triggerable<void(A...)>>;
 
     /// An event is true if it is linked with anything, false otherwise.
@@ -620,8 +564,7 @@ struct Event<void(A...)> : public detail::Port<detail::Triggerable<void(A...)>>
     /// If the other is already a member of another topic, the topics will be merged.
     /// The time complexity of this operation is linear of the number of elements in the topic afterward;
     /// the design is optimized to move the computational cost from the runtime invocation stage to the linking stage.
-    Event& operator>>(Port& that)
-    {
+    Event& operator>>(Port& that) {
         // Events are inserted in the beginning of the topic, while behaviors go to the end. This is needed to
         // avoid rewinding the list to the beginning when commencing topic execution. Since we can effectively join
         // two topics together at any moment, we have to sort the linked list after every insertion.
@@ -630,16 +573,14 @@ struct Event<void(A...)> : public detail::Port<detail::Triggerable<void(A...)>>
         return *this;
     }
 
-    void operator()(A... args) const
-    {
+    void operator()(A... args) const {
         // The list is kept sorted such that the events are in the beginning. This allows us to start traversal from
         // the next (!) node without the need to rewind first; at the same time we can skip some of the initial
         // events. A more interesting design would keep two independent linked lists: a list of ports and a list of
         // behaviors. This will remove unnecessary calls to the empty trigger() function if there is more than one
         // event on the topic.
         detail::ListNode<detail::Triggerable<void(A...)>>* p = this->next();
-        while (p != nullptr)
-        {
+        while (p != nullptr) {
             p->trigger(args...);
             p = p->next();
         }
@@ -650,11 +591,10 @@ struct Event<void(A...)> : public detail::Port<detail::Triggerable<void(A...)>>
 
     virtual ~Event() noexcept = default;
 
-private:
+  private:
     using Fun = void(A...);
 
-    void trigger(A...) const final
-    {
+    void trigger(A...) const final {
         // This is a no-op because events do not have a direct execution behavior. This approach would not work in
         // the case of a non-void return type; there, a slightly more sophisticated handling is needed. Perhaps the
         // event does not need to be Triggerable at all, nor exist on the same hierarchy level as behaviors.
@@ -701,23 +641,19 @@ struct Event<R(A...)>;
 /// To change the default footprint for the callable, wrap it into Footprint<size> and pass as the first argument:
 ///     Pushable<Footprint<128>, A, B, C> in_abc = [this, that, other](const A& a, const B& b, const C& c) { ... };
 template <typename... T>
-struct Pushable final : public Behavior<void(const T&...), default_behavior_footprint>
-{
+struct Pushable final : public Behavior<void(const T&...), default_behavior_footprint> {
     using Behavior<void(const T&...), default_behavior_footprint>::Behavior;
 };
 template <typename... T, std::size_t fp>
-struct Pushable<Footprint<fp>, T...> final : public Behavior<void(const T&...), fp>
-{
+struct Pushable<Footprint<fp>, T...> final : public Behavior<void(const T&...), fp> {
     using Behavior<void(const T&...), fp>::Behavior;
 };
 template <>
-struct Pushable<void> final : public Behavior<void(), default_behavior_footprint>
-{
+struct Pushable<void> final : public Behavior<void(), default_behavior_footprint> {
     using Behavior<void(), default_behavior_footprint>::Behavior;
 };
 template <std::size_t fp>
-struct Pushable<Footprint<fp>, void> final : public Behavior<void(), fp>
-{
+struct Pushable<Footprint<fp>, void> final : public Behavior<void(), fp> {
     using Behavior<void(), fp>::Behavior;
 };
 
@@ -732,14 +668,12 @@ struct Pushable<Footprint<fp>, void> final : public Behavior<void(), fp>
 /// The void specialization is introduced for generality when T is deduced from some function return type:
 /// Pusher<> and Pusher<void> are equivalent.
 template <typename... T>
-struct Pusher final : public Event<void(const T&...)>
-{
+struct Pusher final : public Event<void(const T&...)> {
     using Event<void(const T&...)>::operator();
     using Event<void(const T&...)>::operator>>;
 };
 template <>
-struct Pusher<void> final : public Event<void()>
-{
+struct Pusher<void> final : public Event<void()> {
     using Event<void()>::operator();
     using Event<void()>::operator>>;
 };
@@ -760,13 +694,11 @@ struct Pusher<void> final : public Event<void()>
 /// To change the default footprint for the callable, wrap it into Footprint<size> and pass as the first argument:
 ///     Pullable<Footprint<128>, A, B> out_abc = [this](A& out_a, B& out_b) { ... };
 template <typename... T>
-struct Pullable final : public Behavior<void(T&...), default_behavior_footprint>
-{
+struct Pullable final : public Behavior<void(T&...), default_behavior_footprint> {
     using Behavior<void(T&...), default_behavior_footprint>::Behavior;
 };
 template <typename... T, std::size_t fp>
-struct Pullable<Footprint<fp>, T...> final : public Behavior<void(T&...), fp>
-{
+struct Pullable<Footprint<fp>, T...> final : public Behavior<void(T&...), fp> {
     using Behavior<void(T&...), fp>::Behavior;
 };
 
@@ -781,30 +713,25 @@ struct Pullable<Footprint<fp>, T...> final : public Behavior<void(T&...), fp>
 /// The void specialization is introduced for generality when T is deduced from some function return type:
 /// Pusher<> and Pusher<void> are equivalent.
 template <typename... T>
-struct Puller final : public Event<void(T&...)>
-{
+struct Puller final : public Event<void(T&...)> {
     using Event<void(T&...)>::operator();
     using Event<void(T&...)>::operator>>;
 };
 /// The specialization for a single default-constructible T is equipped with fancy helpers.
 template <typename T>
-requires std::is_default_constructible_v<T>
-struct Puller<T> final : public Event<void(T&)>
-{
+    requires std::is_default_constructible_v<T>
+struct Puller<T> final : public Event<void(T&)> {
     using Event<void(T&)>::operator();
     using Event<void(T&)>::operator>>;
     /// A fancy helper for sourcing the value.
-    T operator*() const
-    {
+    T operator*() const {
         T out{};
         operator()(out);
         return out;
     }
     /// A fancy helper for sourcing the value.
-    auto operator->() const
-    {
-        struct
-        {
+    auto operator->() const {
+        struct {
             T  value{};
             T* operator->() noexcept { return &value; }
         } out;
@@ -813,8 +740,7 @@ struct Puller<T> final : public Event<void(T&)>
     }
 };
 template <>
-struct Puller<void> final : public Event<void()>
-{
+struct Puller<void> final : public Event<void()> {
     using Event::operator();
     using Event::operator>>;
 };
@@ -837,8 +763,7 @@ struct Puller<void> final : public Event<void()>
 /// Do not use Latch to define actor ports; actors usually should only provide {Push,Pull}{able,er} ports.
 /// Latches are normally needed only when linking actors together at the place of use.
 template <typename T, typename In = T, typename Out = T>
-struct Latch
-{
+struct Latch {
     /// The value should be initialized once and left intact. It will updated every time the Latch is pushed.
     T value{};
 
@@ -862,16 +787,14 @@ struct Latch
 /// Since the pull-input is lazy, it has to receive an external trigger to pull the input and then push it out;
 /// this is done via an empty input behavior.
 template <typename T, typename Out = T>
-struct Lift
-{
+struct Lift {
     /// The value should be initialized once and left intact. It will updated every time the Lift is triggered.
     T value{};
 
     Puller<T>   in{};
     Pusher<Out> out{};
 
-    Pushable<> trigger = [this]
-    {
+    Pushable<> trigger = [this] {
         in(value);
         out(static_cast<Out>(value));
     };
@@ -900,32 +823,23 @@ struct Lift
 template <typename Out, typename... In>
 struct PushUnary;
 template <std::size_t fp, typename Out, typename... In>
-struct PushUnary<Footprint<fp>, Out, In...>
-{
+struct PushUnary<Footprint<fp>, Out, In...> {
     template <typename F>
-    requires std::is_invocable_r_v<Out, F, In...>  // NOLINTNEXTLINE(*-explicit-*)
-    explicit(false) PushUnary(F fun) :
-        in(
-            [this, fun_ = std::move(fun)](const In&... val)
-            {
-                if constexpr (std::is_same_v<Out, void>)
-                {
-                    fun_(val...);
-                    out();
-                }
-                else
-                {
-                    out(fun_(val...));
-                }
-            })
-    {
-    }
+        requires std::is_invocable_r_v<Out, F, In...> // NOLINTNEXTLINE(*-explicit-*)
+    explicit(false) PushUnary(F fun)
+      : in([this, fun_ = std::move(fun)](const In&... val) {
+          if constexpr (std::is_same_v<Out, void>) {
+              fun_(val...);
+              out();
+          } else {
+              out(fun_(val...));
+          }
+      }) {}
     Pushable<Footprint<sizeof(std::tuple<std::array<std::byte, fp>, void*>)>, In...> in;
     Pusher<Out>                                                                      out;
 };
 template <typename Out, typename... In>
-struct PushUnary : public PushUnary<Footprint<default_behavior_footprint>, Out, In...>
-{
+struct PushUnary : public PushUnary<Footprint<default_behavior_footprint>, Out, In...> {
     using PushUnary<Footprint<default_behavior_footprint>, Out, In...>::PushUnary;
 };
 
@@ -966,51 +880,39 @@ struct PushUnary : public PushUnary<Footprint<default_behavior_footprint>, Out, 
 template <typename Out, typename... In>
 struct PullUnary;
 template <std::size_t fp, typename Out, typename... In>
-struct PullUnary<Footprint<fp>, Out, In...>
-{
+struct PullUnary<Footprint<fp>, Out, In...> {
     template <typename F>
-    requires(std::is_invocable_r_v<Out, F, In...> && (sizeof...(In) > 0))
-    explicit(false) PullUnary(F&& fun) : PullUnary(std::forward<F>(fun), In{}...)
-    {
-    }
+        requires(std::is_invocable_r_v<Out, F, In...> && (sizeof...(In) > 0))
+    explicit(false) PullUnary(F&& fun)
+      : PullUnary(std::forward<F>(fun), In{}...) {}
     template <typename F>
-    requires std::is_invocable_r_v<Out, F, In...>
-    explicit(false) PullUnary(F fun, In... initial_values) :
-        value(std::move(initial_values)...),
-        out(
-            [this, fun_ = std::move(fun)](Out& val)
-            {
-                std::apply(in, value);
-                val = std::apply(fun_, value);
-            })
-    {
-    }
+        requires std::is_invocable_r_v<Out, F, In...>
+    explicit(false) PullUnary(F fun, In... initial_values)
+      : value(std::move(initial_values)...)
+      , out([this, fun_ = std::move(fun)](Out& val) {
+          std::apply(in, value);
+          val = std::apply(fun_, value);
+      }) {}
     [[no_unique_address]] std::tuple<In...>                                        value{};
     Puller<In...>                                                                  in{};
     Pullable<Footprint<sizeof(std::tuple<std::array<std::byte, fp>, void*>)>, Out> out;
 };
 template <std::size_t fp, typename Out, typename In>
-struct PullUnary<Footprint<fp>, Out, In>
-{
+struct PullUnary<Footprint<fp>, Out, In> {
     template <typename F>
-    requires std::is_invocable_r_v<Out, F, In>
-    explicit(false) PullUnary(F fun, In initial_value = {}) :
-        value(std::move(initial_value)),
-        out(
-            [this, fun_ = std::move(fun)](Out& val)
-            {
-                in(value);
-                val = fun_(value);
-            })
-    {
-    }
+        requires std::is_invocable_r_v<Out, F, In>
+    explicit(false) PullUnary(F fun, In initial_value = {})
+      : value(std::move(initial_value))
+      , out([this, fun_ = std::move(fun)](Out& val) {
+          in(value);
+          val = fun_(value);
+      }) {}
     In                                                                             value;
     Puller<In>                                                                     in{};
     Pullable<Footprint<sizeof(std::tuple<std::array<std::byte, fp>, void*>)>, Out> out;
 };
 template <typename Out, typename... In>
-struct PullUnary : public PullUnary<Footprint<default_behavior_footprint>, Out, In...>
-{
+struct PullUnary : public PullUnary<Footprint<default_behavior_footprint>, Out, In...> {
     using PullUnary<Footprint<default_behavior_footprint>, Out, In...>::PullUnary;
 };
 
@@ -1048,33 +950,27 @@ struct PullUnary : public PullUnary<Footprint<default_behavior_footprint>, Out, 
 template <typename Out, typename... In>
 struct PullNary;
 template <std::size_t fp, typename Out, typename... In>
-struct PullNary<Footprint<fp>, Out, In...>
-{
+struct PullNary<Footprint<fp>, Out, In...> {
     template <typename F>
-    requires(std::is_invocable_r_v<Out, F, In...> && (sizeof...(In) > 0))
-    explicit(false) PullNary(F&& fun) : PullNary(std::forward<F>(fun), In{}...)
-    {
-    }
+        requires(std::is_invocable_r_v<Out, F, In...> && (sizeof...(In) > 0))
+    explicit(false) PullNary(F&& fun)
+      : PullNary(std::forward<F>(fun), In{}...) {}
     template <typename F>
-    requires std::is_invocable_r_v<Out, F, In...>
-    explicit(false) PullNary(F fun, In... initial_values) :
-        value(std::move(initial_values)...),
-        out(
-            [this, fun_ = std::move(fun)](Out& val)
-            {
-                ([this]<std::size_t... Is>(const std::index_sequence<Is...>)
-                 { (std::get<Is>(in)(std::get<Is>(value)), ...); })(std::make_index_sequence<sizeof...(In)>{});
-                val = std::apply(fun_, value);
-            })
-    {
-    }
+        requires std::is_invocable_r_v<Out, F, In...>
+    explicit(false) PullNary(F fun, In... initial_values)
+      : value(std::move(initial_values)...)
+      , out([this, fun_ = std::move(fun)](Out& val) {
+          ([this]<std::size_t... Is>(const std::index_sequence<Is...>) {
+              (std::get<Is>(in)(std::get<Is>(value)), ...);
+          })(std::make_index_sequence<sizeof...(In)>{});
+          val = std::apply(fun_, value);
+      }) {}
     [[no_unique_address]] std::tuple<In...>                                        value;
     [[no_unique_address]] std::tuple<Puller<In>...>                                in{};
     Pullable<Footprint<sizeof(std::tuple<std::array<std::byte, fp>, void*>)>, Out> out;
 };
 template <typename Out, typename... In>
-struct PullNary : public PullNary<Footprint<default_behavior_footprint>, Out, In...>
-{
+struct PullNary : public PullNary<Footprint<default_behavior_footprint>, Out, In...> {
     using PullNary<Footprint<default_behavior_footprint>, Out, In...>::PullNary;
 };
 
@@ -1083,17 +979,17 @@ struct PullNary : public PullNary<Footprint<default_behavior_footprint>, Out, In
 /// Casts the input from From to To on every push using static_cast. This is a special case of PushUnary.
 /// 'To' can be void, which means that the out-event will be called without arguments.
 template <typename To, typename From>
-struct PushCast final : public PushUnary<Footprint<sizeof([] {})>, To, From>
-{
-    PushCast() : PushUnary<Footprint<sizeof([] {})>, To, From>([](const From& val) { return static_cast<To>(val); }) {}
+struct PushCast final : public PushUnary<Footprint<sizeof([] {})>, To, From> {
+    PushCast()
+      : PushUnary<Footprint<sizeof([] {})>, To, From>([](const From& val) { return static_cast<To>(val); }) {}
 };
 /// Casts the input from From to To on every pull using static_cast. This is a special case of PullUnary.
 /// The 'value' field is a temporary that is used to store the input value before it is cast;
 /// it is exposed to support the case when From is not default-constructible.
 template <typename To, typename From>
-struct PullCast final : public PullUnary<Footprint<sizeof([] {})>, To, From>
-{
-    PullCast() : PullUnary<Footprint<sizeof([] {})>, To, From>([](const From& val) { return static_cast<To>(val); }) {}
+struct PullCast final : public PullUnary<Footprint<sizeof([] {})>, To, From> {
+    PullCast()
+      : PullUnary<Footprint<sizeof([] {})>, To, From>([](const From& val) { return static_cast<To>(val); }) {}
 };
 
 // ====================================================================================================================
@@ -1103,17 +999,14 @@ struct PullCast final : public PullUnary<Footprint<sizeof([] {})>, To, From>
 /// The passed lambda is not stored anywhere, so it has an empty footprint (esp. if [[no_unique_address]] is used).
 /// Usage:
 ///
-///     struct MyActor
-///     {
+///     struct MyActor {
 ///         // ...fields...
 ///         Ctor _ = [this]{ ...initialization code... };
 ///     };
-struct Ctor final
-{
+struct Ctor final {
     template <typename F>
-    requires std::is_invocable_r_v<void, F>
-    explicit(false) Ctor(F&& fun)  // NOSONAR does not match on copy/move due to the concept requirement.
-    {
+        requires std::is_invocable_r_v<void, F>
+    explicit(false) Ctor(F&& fun) {
         std::forward<F>(fun)();
     }
 };
@@ -1129,31 +1022,27 @@ struct Ctor final
 /// While it is valid to capture this, it breaks if the object is moved, because the lambda will still capture the
 /// original object, which may no longer exist at the old address. See https://stackoverflow.com/q/78937332/1007777
 template <std::size_t footprint = sizeof(void*) * 10>
-class Finalizer final
-{
-public:
+class Finalizer final {
+  public:
     using Fun = Function<void(), footprint>;
 
-    Finalizer() noexcept : Finalizer([] {}) {}
+    Finalizer() noexcept
+      : Finalizer([] {}) {}
 
     template <typename F>
-    requires(Fun::template is_valid_target<F>)
-    explicit(false) Finalizer(F&& action) noexcept :  // NOSONAR does not match on copy/move
-        act_(std::forward<F>(action))
-    {
-    }
+        requires(Fun::template is_valid_target<F>)
+    explicit(false) Finalizer(F&& action) noexcept
+      : act_(std::forward<F>(action)) {}
 
     Finalizer(const Finalizer&) = delete;
-    Finalizer(Finalizer&& that) noexcept : act_(std::move(that.act_))
-    {
+    Finalizer(Finalizer&& that) noexcept
+      : act_(std::move(that.act_)) {
         that.act_ = [] {};
     }
 
     Finalizer& operator=(const Finalizer&) = delete;
-    Finalizer& operator=(Finalizer&& that) noexcept
-    {
-        if (this != &that)
-        {
+    Finalizer& operator=(Finalizer&& that) noexcept {
+        if (this != &that) {
             act_();
             act_      = std::move(that.act_);
             that.act_ = [] {};
@@ -1164,13 +1053,12 @@ public:
     ~Finalizer() noexcept { act_(); }
 
     /// Disengages the finalizer without triggering the action.
-    void disarm() noexcept
-    {
+    void disarm() noexcept {
         act_ = [] {};
     }
 
-private:
+  private:
     Fun act_;
 };
 
-}  // namespace ramen
+} // namespace ramen

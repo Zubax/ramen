@@ -35,8 +35,7 @@ using namespace std::chrono_literals;
 ///                           (Time) │               │
 ///                 in_tick ────────►│               │
 ///                                  └───────────────┘
-struct PidController
-{
+struct PidController {
     // PRIVATE ACTOR STATES
     // It is convenient to define them near the top to make them accessible for the behavior definitions below.
     //
@@ -45,11 +44,11 @@ struct PidController
     // events and behaviors. This is a key feature of flow-based programming that enables the composability of actors.
     //
     // As a positive side effect, public fields enable aggregate initialization.
-    std::array<float, 2> gain_pi{0, 0};
-    std::array<float, 2> integration_min_max{0, 0};
-    float                integral{0};
-    float                setpoint{0};
-    float                process_variable{0};
+    std::array<float, 2> gain_pi{ 0, 0 };
+    std::array<float, 2> integration_min_max{ 0, 0 };
+    float                integral{ 0 };
+    float                setpoint{ 0 };
+    float                process_variable{ 0 };
 
     // EVENTS
     // These ports allow the actor to trigger behaviors in other actors that it is connected to.
@@ -59,8 +58,7 @@ struct PidController
 
     // BEHAVIORS
     // This is where the actual logic of the actor is implemented.
-    ramen::Pushable<Time> in_tick = [this](const Time time_delta)
-    {
+    ramen::Pushable<Time> in_tick = [this](const Time time_delta) {
         const float dt    = std::chrono::duration_cast<std::chrono::duration<float>>(time_delta).count();
         const float error = setpoint - process_variable;
         integral = std::clamp(integral + (error * dt * gain_pi[1]), integration_min_max[0], integration_min_max[1]);
@@ -76,11 +74,10 @@ struct PidController
 ///                    (float) │ Sinewave │ (float)
 ///             input ────────►│          ├────────► output
 ///                            └──────────┘
-struct Sinewave
-{
-    float freq{1};
-    float amp{1};
-    float phase{0};
+struct Sinewave {
+    float freq{ 1 };
+    float amp{ 1 };
+    float phase{ 0 };
 
     ramen::Pusher<float> output{};
 
@@ -99,36 +96,34 @@ struct Sinewave
 ///                                  (Time) │              │
 ///                        in_tick ────────►│              │
 ///                                         └──────────────┘
-struct ThermalModel
-{
+struct ThermalModel {
     // INTERNAL STATES
-    float temperature{0};
-    float heating_factor{1};
-    float dissipation_factor{1};
-    float heat_source{0};
-    float environment_temperature{0};
+    float temperature{ 0 };
+    float heating_factor{ 1 };
+    float dissipation_factor{ 1 };
+    float heat_source{ 0 };
+    float environment_temperature{ 0 };
 
     // EVENTS
     ramen::Pusher<float> out_temperature{};
 
     // BEHAVIORS
-    ramen::Pushable<Time> in_tick = [this](const Time time_delta)
-    {
+    ramen::Pushable<Time> in_tick = [this](const Time time_delta) {
         const float dt = std::chrono::duration_cast<std::chrono::duration<float>>(time_delta).count();
-        temperature += heat_source * heating_factor * dt;                                  // Energy input
-        temperature -= (temperature - environment_temperature) * dissipation_factor * dt;  // Dissipation
+        temperature += heat_source * heating_factor * dt;                                 // Energy input
+        temperature -= (temperature - environment_temperature) * dissipation_factor * dt; // Dissipation
         out_temperature(temperature);
     };
     ramen::Pushable<float> in_heat_source             = [this](const float x) { heat_source = x; };
     ramen::Pushable<float> in_environment_temperature = [this](const float x) { environment_temperature = x; };
 };
 
-int main()  // NOLINT(bugprone-exception-escape)
+int main() // NOLINT(bugprone-exception-escape)
 {
     // Instantiate the actors.
-    ThermalModel  plant{.temperature = 0, .heating_factor = 0.1F, .dissipation_factor = 0.1F};
-    Sinewave      commander{.freq = 1.0F, .amp = 10};
-    PidController controller{.gain_pi = {100, 10}, .integration_min_max = {-100, 100}};
+    ThermalModel  plant{ .temperature = 0, .heating_factor = 0.1F, .dissipation_factor = 0.1F };
+    Sinewave      commander{ .freq = 1.0F, .amp = 10 };
+    PidController controller{ .gain_pi = { 100, 10 }, .integration_min_max = { -100, 100 } };
 
     // ----------------------------------------------------------------------------------------------------------------
 
@@ -149,7 +144,7 @@ int main()  // NOLINT(bugprone-exception-escape)
     // in the push model they are the same, but in the pull model they are the opposite.
     ticker >> controller.in_tick >> plant.in_tick;
     commander_time >> commander.input;
-    commander.output >> controller.in_setpoint;  // We can also connect it to the float_printer for visualization.
+    commander.output >> controller.in_setpoint; // We can also connect it to the float_printer for visualization.
     controller.out_effort >> plant.in_heat_source;
     plant.out_temperature >> controller.in_process_variable >> float_printer;
     environment_temperature >> plant.in_environment_temperature;
@@ -159,8 +154,7 @@ int main()  // NOLINT(bugprone-exception-escape)
     // Run the simulation by simply pulling the final output_temperature port.
     // Every time it is pulled, the entire network will be evaluated.
     auto time = std::chrono::steady_clock::now();
-    for (int i = 0; i < 200; i++)
-    {
+    for (int i = 0; i < 200; i++) {
         const auto t  = std::chrono::steady_clock::now();
         const auto dt = t - time;
         time          = t;

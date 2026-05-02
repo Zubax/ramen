@@ -6,10 +6,8 @@
 #include <cstdint>
 #include <string_view>
 
-namespace
-{
-struct FunX2 final
-{
+namespace {
+struct FunX2 final {
     static inline std::uint32_t count_dtor;
     static inline std::uint32_t count_move;
 
@@ -22,16 +20,14 @@ struct FunX2 final
     FunX2& operator=(FunX2&&)      = delete;
     ~FunX2() { count_dtor++; }
 
-    static void reset()
-    {
+    static void reset() {
         count_dtor = 0;
         count_move = 0;
     }
 };
 
 // NOLINTBEGIN(bugprone-use-after-move,hicpp-invalid-access-moved,clang-diagnostic-self-move,clang-analyzer-cplusplus.Move)
-TEST_CASE("function")
-{
+TEST_CASE("function") {
     FunX2::reset();
     using ramen::Function;
     {
@@ -66,9 +62,9 @@ TEST_CASE("function")
             REQUIRE(4 == FunX2::count_dtor);
             REQUIRE(4 == FunX2::count_move);
             fun_b = std::move(fun_a);
-            REQUIRE(5 == FunX2::count_dtor);  // Old in B destroyed.
+            REQUIRE(5 == FunX2::count_dtor); // Old in B destroyed.
             REQUIRE(5 == FunX2::count_move);
-            (void) fun_b;
+            (void)fun_b;
         }
         REQUIRE(6 == FunX2::count_dtor);
         REQUIRE(5 == FunX2::count_move);
@@ -95,13 +91,13 @@ TEST_CASE("function")
         Function<int(int), 16, 16> fun_a = FunX2{};
         REQUIRE(1 == FunX2::count_dtor);
         REQUIRE(1 == FunX2::count_move);
-        Function<int(int), 32, 32> fun_b = std::move(fun_a);  // Reverse won't compile.
+        Function<int(int), 32, 32> fun_b = std::move(fun_a); // Reverse won't compile.
         REQUIRE(1 == FunX2::count_dtor);
         REQUIRE(2 == FunX2::count_move);
-        fun_b = std::move(fun_a);  // Reverse won't compile.
+        fun_b = std::move(fun_a); // Reverse won't compile.
         REQUIRE(2 == FunX2::count_dtor);
         REQUIRE(3 == FunX2::count_move);
-        (void) fun_b;
+        (void)fun_b;
     }
     REQUIRE(4 == FunX2::count_dtor);
     REQUIRE(3 == FunX2::count_move);
@@ -109,53 +105,50 @@ TEST_CASE("function")
 }
 // NOLINTEND(bugprone-use-after-move,hicpp-invalid-access-moved,clang-diagnostic-self-move,clang-analyzer-cplusplus.Move)
 
-TEST_CASE("list_node")
-{
+TEST_CASE("list_node") {
     using ramen::detail::ListNode;
-    struct Value
-    {
+    struct Value {
         char val;
-        explicit Value(const char v) : val(v) {}
+        explicit Value(const char v)
+          : val(v) {}
     };
-    struct Node final : ListNode<Value>
-    {
-        explicit Node(const char x) : ListNode<Value>(x) {}
+    struct Node final : ListNode<Value> {
+        explicit Node(const char x)
+          : ListNode<Value>(x) {}
     };
-    Node a{'a'};
-    Node b{'b'};
-    Node c{'c'};
-    Node d{'d'};
-    Node e{'e'};
-    Node f{'f'};
+    Node a{ 'a' };
+    Node b{ 'b' };
+    Node c{ 'c' };
+    Node d{ 'd' };
+    Node e{ 'e' };
+    Node f{ 'f' };
 
     // First sublist: a -> b -> f
     REQUIRE(!a.linked());
     REQUIRE(!b.linked());
-    a.merge(&a);       // no effect
-    a.merge(nullptr);  // no effect
+    a.merge(&a);      // no effect
+    a.merge(nullptr); // no effect
     REQUIRE(!a.linked());
     REQUIRE(!b.linked());
-    a.merge(&b);  // a,b
-    a.merge(&f);  // a,b,f
-    b.merge(&f);  // no effect -- already in the list
+    a.merge(&b); // a,b
+    a.merge(&f); // a,b,f
+    b.merge(&f); // no effect -- already in the list
     REQUIRE(a.linked());
     REQUIRE(b.linked());
 
     // Second sublist: c -> d -> e
-    c.merge(&d);  // c,d
-    c.merge(&e);  // c,d,e
-    e.merge(&d);  // no effect -- already in the list
+    c.merge(&d); // c,d
+    c.merge(&e); // c,d,e
+    e.merge(&d); // no effect -- already in the list
     REQUIRE(c.linked());
     REQUIRE(d.linked());
     REQUIRE(e.linked());
 
-    const auto unroll_onwards = [](const Node* const n)
-    {
+    const auto unroll_onwards = [](const Node* const n) {
         std::array<char, 100>  result{};
         std::size_t            i = 0;
         const ListNode<Value>* p = n;
-        while (p != nullptr)
-        {
+        while (p != nullptr) {
             result.at(i++) = p->val;
             p              = p->next();
         }
@@ -190,7 +183,7 @@ TEST_CASE("list_node")
     REQUIRE(b.tail() == &d);
 
     // Insert the nodes back again.
-    a.merge(&c);  // Note how we're linking against c here! It will be rewound.
+    a.merge(&c); // Note how we're linking against c here! It will be rewound.
     REQUIRE(std::string_view("abcd") == unroll_onwards(&a).data());
     e.merge(&f);
     REQUIRE(std::string_view("ef") == unroll_onwards(&e).data());
@@ -202,7 +195,7 @@ TEST_CASE("list_node")
 
     // Clusterize vowels first, then consonants.
     c.clusterize<2>([](const ListNode<Value>& n) { return !is_vowel(n.val); });
-    REQUIRE(a.head() == &a);  // a is the head of the list
+    REQUIRE(a.head() == &a); // a is the head of the list
     REQUIRE(a.tail() == &f);
     REQUIRE(std::string_view("aebcdf") == unroll_onwards(&a).data());
 
@@ -213,27 +206,27 @@ TEST_CASE("list_node")
 
     // Also clusterization but with some clusters unused: first, middle, and last.
     c.clusterize<5>([](const ListNode<Value>& n) -> std::size_t { return is_vowel(n.val) ? 1 : 3; });
-    REQUIRE(a.head() == &a);  // a is the head of the list
+    REQUIRE(a.head() == &a); // a is the head of the list
     REQUIRE(a.tail() == &f);
     REQUIRE(std::string_view("aebcdf") == unroll_onwards(&a).data());
 
     // Simple sorting -- each letter gets its own category.
     c.clusterize<10>([](const ListNode<Value>& n) -> std::size_t { return static_cast<std::size_t>(n.val - 'a'); });
-    REQUIRE(a.head() == &a);  // a is the head of the list
+    REQUIRE(a.head() == &a); // a is the head of the list
     REQUIRE(a.tail() == &f);
     REQUIRE(std::string_view("abcdef") == unroll_onwards(&a).data());
 
     // Degenerate clusterization -- all elements go to the same cluster. Ordering not affected.
     c.clusterize<3>([](const ListNode<Value>&) -> std::size_t { return 0; });
-    REQUIRE(a.head() == &a);  // a is the head of the list
+    REQUIRE(a.head() == &a); // a is the head of the list
     REQUIRE(a.tail() == &f);
     REQUIRE(std::string_view("abcdef") == unroll_onwards(&a).data());
 
     // Same but only one cluster.
     c.clusterize<1>([](const ListNode<Value>&) -> std::size_t { return 0; });
-    REQUIRE(a.head() == &a);  // a is the head of the list
+    REQUIRE(a.head() == &a); // a is the head of the list
     REQUIRE(a.tail() == &f);
     REQUIRE(std::string_view("abcdef") == unroll_onwards(&a).data());
 }
 
-}  // namespace
+} // namespace

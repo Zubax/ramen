@@ -10,15 +10,14 @@
 #include <iostream>
 #include <random>
 
-namespace
-{
+namespace {
 
 /// This emulates the case of Eigen matrix views, which must be bound to a matrix object upon construction.
 /// This is a very common use case in control systems and DSP, so this is a first-class use case.
-struct NonDefaultConstructible
-{
+struct NonDefaultConstructible {
     char& ref;
-    explicit NonDefaultConstructible(char& ref) : ref(ref) {}
+    explicit NonDefaultConstructible(char& ref)
+      : ref(ref) {}
     NonDefaultConstructible(const NonDefaultConstructible&)            = delete;
     NonDefaultConstructible(NonDefaultConstructible&&)                 = delete;
     NonDefaultConstructible& operator=(const NonDefaultConstructible&) = delete;
@@ -26,8 +25,7 @@ struct NonDefaultConstructible
     ~NonDefaultConstructible()                                         = default;
 };
 
-TEST_CASE("pull")
-{
+TEST_CASE("pull") {
     using ramen::Pullable;
     using ramen::Puller;
 
@@ -47,13 +45,13 @@ TEST_CASE("pull")
     REQUIRE(!out_bhv_a);
     REQUIRE(!out_bhv_b);
 
-    REQUIRE('\0' == *in_evt_a);  // Not linked yet
+    REQUIRE('\0' == *in_evt_a); // Not linked yet
     in_evt_a >> out_bhv_a;
     REQUIRE('a' == *in_evt_a);
     in_evt_b >> in_evt_a;
     REQUIRE('a' == *in_evt_a);
     REQUIRE('a' == *in_evt_b);
-    in_evt_b >> out_bhv_b;  // Later-linked behavior overwrites the value.
+    in_evt_b >> out_bhv_b; // Later-linked behavior overwrites the value.
     REQUIRE('b' == *in_evt_a);
     REQUIRE('b' == *in_evt_b);
 
@@ -72,11 +70,10 @@ TEST_CASE("pull")
     REQUIRE(in_evt_b);
     REQUIRE(out_bhv_a);
     opt_in_evt_b.reset();
-    REQUIRE(!out_bhv_a);  // All detached.
+    REQUIRE(!out_bhv_a); // All detached.
 }
 
-TEST_CASE("pull_non_default_constructible")
-{
+TEST_CASE("pull_non_default_constructible") {
     using ramen::Pullable;
     using ramen::Puller;
     // ReSharper disable once CppParameterMayBeConstPtrOrRef
@@ -84,15 +81,14 @@ TEST_CASE("pull_non_default_constructible")
     Puller<NonDefaultConstructible>   in_evt;
     in_evt >> out_bhv;
 
-    char                    storage = '\0';  // This is like an ordinary Eigen matrix.
-    NonDefaultConstructible ndc{storage};    // And this is like a view of that matrix.
+    char                    storage = '\0'; // This is like an ordinary Eigen matrix.
+    NonDefaultConstructible ndc{ storage }; // And this is like a view of that matrix.
     REQUIRE('\0' == storage);
     in_evt(ndc);
     REQUIRE('a' == storage);
 }
 
-TEST_CASE("push")
-{
+TEST_CASE("push") {
     using ramen::Pushable;
     using ramen::Pusher;
 
@@ -114,7 +110,7 @@ TEST_CASE("push")
     REQUIRE(!in_bhv_a);
     REQUIRE(!in_bhv_b);
 
-    out_evt_a('z');  // No effect, not linked yet.
+    out_evt_a('z'); // No effect, not linked yet.
     REQUIRE('\0' == a);
     REQUIRE('\0' == b);
     out_evt_a >> in_bhv_a;
@@ -149,11 +145,10 @@ TEST_CASE("push")
     REQUIRE(out_evt_b);
     REQUIRE(in_bhv_a);
     opt_out_evt_b.reset();
-    REQUIRE(!in_bhv_a);  // All detached.
+    REQUIRE(!in_bhv_a); // All detached.
 }
 
-TEST_CASE("performance")
-{
+TEST_CASE("performance") {
     using ramen::Callable;
     using ramen::Pullable;
     using ramen::Puller;
@@ -163,44 +158,42 @@ TEST_CASE("performance")
     const bool              choice     = (entropy() % 2) == 0;
     constexpr std::uint32_t iterations = 30'000'000;
     static constexpr float  magic      = 1e-5F;
-    float                   y          = 0;  // This is an artificial data dependency to constrain the optimization.
+    float                   y          = 0; // This is an artificial data dependency to constrain the optimization.
 
     const auto reset_y = [&y, &entropy] { y = 1.0F / static_cast<float>((entropy() % 0xFF'FF'FF) + 1); };
 
     // OOP reference for comparison. Different implementations and dummy data to avoid devirtualization and inlining.
     using Base = Callable<void(float&)>;
-    struct Impl1 : public Base  // NOLINT(cppcoreguidelines-special-member-functions,hicpp-special-member-functions)
+    struct Impl1 : public Base // NOLINT(cppcoreguidelines-special-member-functions,hicpp-special-member-functions)
     {
         float& y;
-        explicit Impl1(float& y) : y(y) {}
-        void operator()(float& x) const override
-        {
+        explicit Impl1(float& y)
+          : y(y) {}
+        void operator()(float& x) const override {
             x += y;
             y += magic;
         }
         virtual ~Impl1() = default;
-    } const oop_1{y};
-    struct Impl2 : public Base  // NOLINT(cppcoreguidelines-special-member-functions,hicpp-special-member-functions)
+    } const oop_1{ y };
+    struct Impl2 : public Base // NOLINT(cppcoreguidelines-special-member-functions,hicpp-special-member-functions)
     {
         float& y;
-        explicit Impl2(float& y) : y(y) {}
-        void operator()(float& x) const override
-        {
+        explicit Impl2(float& y)
+          : y(y) {}
+        void operator()(float& x) const override {
             x -= y;
             y += magic;
         }
         virtual ~Impl2() = default;
-    } const oop_2{y};
+    } const oop_2{ y };
     const Base& oop = choice ? static_cast<const Base&>(oop_1) : static_cast<const Base&>(oop_2);
 
     // Actor model alternative that does the same.
-    Pullable<float> out_bhv_1 = [&y](float& x)
-    {
+    Pullable<float> out_bhv_1 = [&y](float& x) {
         x += y;
         y += magic;
     };
-    Pullable<float> out_bhv_2 = [&y](float& x)
-    {
+    Pullable<float> out_bhv_2 = [&y](float& x) {
         x -= y;
         y += magic;
     };
@@ -213,13 +206,12 @@ TEST_CASE("performance")
     {
         float      x     = 0;
         const auto start = std::chrono::steady_clock::now();
-        for (std::uint32_t i = 0; i < iterations; i++)
-        {
-            x += y;  // There is an intentional data dependency between sequential loop executions.
+        for (std::uint32_t i = 0; i < iterations; i++) {
+            x += y; // There is an intentional data dependency between sequential loop executions.
             y += magic;
         }
         elapsed_baseline = std::chrono::steady_clock::now() - start;
-        std::cout << "Final value: " << x << "\n";  // Explicit data dependency to constrain optimization
+        std::cout << "Final value: " << x << "\n"; // Explicit data dependency to constrain optimization
     }
     // Benchmark the OOP version.
     reset_y();
@@ -227,12 +219,11 @@ TEST_CASE("performance")
     {
         float      x     = 0;
         const auto start = std::chrono::steady_clock::now();
-        for (std::uint32_t i = 0; i < iterations; i++)
-        {
+        for (std::uint32_t i = 0; i < iterations; i++) {
             oop(x);
         }
         elapsed_oop = std::chrono::steady_clock::now() - start;
-        std::cout << "Final value: " << x << "\n";  // Explicit data dependency to constrain optimization
+        std::cout << "Final value: " << x << "\n"; // Explicit data dependency to constrain optimization
     }
     // Benchmark the actor model version.
     reset_y();
@@ -240,12 +231,11 @@ TEST_CASE("performance")
     {
         float      x     = 0;
         const auto start = std::chrono::steady_clock::now();
-        for (std::uint32_t i = 0; i < iterations; i++)
-        {
+        for (std::uint32_t i = 0; i < iterations; i++) {
             in_evt(x);
         }
         elapsed_actor = std::chrono::steady_clock::now() - start;
-        std::cout << "Final value: " << x << "\n";  // Explicit data dependency to constrain optimization
+        std::cout << "Final value: " << x << "\n"; // Explicit data dependency to constrain optimization
     }
 
     std::cout << "Baseline: elapsed: " << elapsed_baseline.count()
@@ -255,7 +245,7 @@ TEST_CASE("performance")
     std::cout << "Actor:    elapsed: " << elapsed_actor.count()
               << "; per iteration: " << (elapsed_actor / iterations).count() << "\n";
     using D                            = std::chrono::duration<float>;
-    const float slowdown_uncompensated = std::chrono::duration_cast<D>(elapsed_actor) /  //
+    const float slowdown_uncompensated = std::chrono::duration_cast<D>(elapsed_actor) / //
                                          std::chrono::duration_cast<D>(elapsed_oop);
     const float slowdown_compensated = std::chrono::duration_cast<D>(elapsed_actor - elapsed_baseline) /
                                        std::chrono::duration_cast<D>(elapsed_oop - elapsed_baseline);
@@ -263,15 +253,14 @@ TEST_CASE("performance")
               << "; compensated: " << slowdown_compensated << "\n";
 }
 
-TEST_CASE("latch")
-{
+TEST_CASE("latch") {
+    using ramen::Latch;
+    using ramen::Puller;
     using ramen::Pushable;
     using ramen::Pusher;
-    using ramen::Puller;
-    using ramen::Latch;
     Pusher<float>             out_evt;
     Puller<double>            in_evt;
-    Latch<int, float, double> latch{0};
+    Latch<int, float, double> latch{ 0 };
     out_evt >> latch.in;
     in_evt >> latch.out;
     REQUIRE(0 == *in_evt);
@@ -279,12 +268,11 @@ TEST_CASE("latch")
     REQUIRE(123 == *in_evt);
 }
 
-TEST_CASE("lift")
-{
+TEST_CASE("lift") {
+    using ramen::Lift;
+    using ramen::Pullable;
     using ramen::Pushable;
     using ramen::Pusher;
-    using ramen::Pullable;
-    using ramen::Lift;
     std::int16_t                      input   = 0;
     std::uint64_t                     output  = 0;
     Pullable<std::int16_t>            out_bhv = [&input](std::int16_t& x) { x = input; };
@@ -303,11 +291,10 @@ TEST_CASE("lift")
     REQUIRE(4321 == output);
 }
 
-TEST_CASE("push_unary")
-{
-    using ramen::PushUnary;
-    using ramen::Pusher;
+TEST_CASE("push_unary") {
     using ramen::Latch;
+    using ramen::Pusher;
+    using ramen::PushUnary;
     Latch<int>            output;
     PushUnary<int, float> obj = [](const float x) { return static_cast<int>(x * 2); };
     Pusher<float>         trigger;
@@ -317,12 +304,11 @@ TEST_CASE("push_unary")
     REQUIRE(3 == output.value);
 }
 
-TEST_CASE("push_unary_void")
-{
-    using ramen::PushUnary;
-    using ramen::Pusher;
-    using ramen::Pushable;
+TEST_CASE("push_unary_void") {
     using ramen::Footprint;
+    using ramen::Pushable;
+    using ramen::Pusher;
+    using ramen::PushUnary;
     std::uint64_t                                 counter  = 0;
     int                                           argument = 0;
     Pushable<>                                    in_bhv   = [&] { counter++; };
@@ -338,23 +324,21 @@ TEST_CASE("push_unary_void")
     REQUIRE(2 == counter);
 }
 
-TEST_CASE("pull_unary_0")
-{
-    using ramen::PullUnary;
+TEST_CASE("pull_unary_0") {
     using ramen::Puller;
+    using ramen::PullUnary;
     PullUnary<int> obj = [] { return 9; };
     Puller<int>    trigger;
     trigger >> obj.out;
     REQUIRE(9 == *trigger);
 }
 
-TEST_CASE("pull_unary_1")
-{
-    using ramen::Latch;
-    using ramen::PullUnary;
-    using ramen::Puller;
+TEST_CASE("pull_unary_1") {
     using ramen::Footprint;
-    Latch<float>                        input{1.5F};
+    using ramen::Latch;
+    using ramen::Puller;
+    using ramen::PullUnary;
+    Latch<float>                        input{ 1.5F };
     PullUnary<Footprint<1>, int, float> obj = [](const float x) { return static_cast<int>(x * 2); };
     Puller<int>                         trigger;
     trigger >> obj.out;
@@ -362,14 +346,12 @@ TEST_CASE("pull_unary_1")
     REQUIRE(3 == *trigger);
 }
 
-TEST_CASE("pull_unary_2_init")
-{
-    using ramen::Pullable;
-    using ramen::PullUnary;
-    using ramen::Puller;
+TEST_CASE("pull_unary_2_init") {
     using ramen::Footprint;
-    Pullable<float, double> input = [](float& out_a, double& out_b)
-    {
+    using ramen::Pullable;
+    using ramen::Puller;
+    using ramen::PullUnary;
+    Pullable<float, double> input = [](float& out_a, double& out_b) {
         out_a = 1.7F;
         out_b = 2.5;
     };
@@ -384,44 +366,42 @@ TEST_CASE("pull_unary_2_init")
     REQUIRE(4 == *trigger);
 }
 
-TEST_CASE("pull_unary_2_default")
-{
-    using ramen::Pullable;
-    using ramen::PullUnary;
-    using ramen::Puller;
+TEST_CASE("pull_unary_2_default") {
     using ramen::Footprint;
-    Pullable<float, double> input = [](float& out_a, double& out_b)
-    {
+    using ramen::Pullable;
+    using ramen::Puller;
+    using ramen::PullUnary;
+    Pullable<float, double> input = [](float& out_a, double& out_b) {
         out_a = 1.7F;
         out_b = 2.5;
     };
-    PullUnary<Footprint<1>, int, float, double> obj = [](const float x, const double y)
-    { return static_cast<int>(static_cast<double>(x) * y); };
+    PullUnary<Footprint<1>, int, float, double> obj = [](const float x, const double y) {
+        return static_cast<int>(static_cast<double>(x) * y);
+    };
     Puller<int> trigger;
     trigger >> obj.out;
     obj.in >> input;
     REQUIRE(4 == *trigger);
 }
 
-TEST_CASE("pull_nary_0")
-{
-    using ramen::PullNary;
+TEST_CASE("pull_nary_0") {
     using ramen::Puller;
+    using ramen::PullNary;
     PullNary<int> obj = [] { return 123; };
     Puller<int>   trigger;
     obj.out ^ trigger;
     REQUIRE(123 == *trigger);
 }
 
-TEST_CASE("pull_nary_2")
-{
-    using ramen::PullNary;
-    using ramen::Puller;
+TEST_CASE("pull_nary_2") {
     using ramen::Latch;
-    Latch<int>                   a{123};
-    Latch<double>                b{456.0};
-    PullNary<float, int, double> obj = [](const int x, const double y)
-    { return static_cast<float>(static_cast<double>(x) * y); };
+    using ramen::Puller;
+    using ramen::PullNary;
+    Latch<int>                   a{ 123 };
+    Latch<double>                b{ 456.0 };
+    PullNary<float, int, double> obj = [](const int x, const double y) {
+        return static_cast<float>(static_cast<double>(x) * y);
+    };
     Puller<float> trigger;
     obj.out ^ trigger;
     std::get<0>(obj.in) ^ a.out;
@@ -429,14 +409,13 @@ TEST_CASE("pull_nary_2")
     REQUIRE(*trigger == doctest::Approx(56088));
 }
 
-TEST_CASE("cast")
-{
-    using ramen::PushCast;
-    using ramen::PullCast;
-    using ramen::Pusher;
-    using ramen::Puller;
+TEST_CASE("cast") {
     using ramen::Latch;
-    Latch<int>            latch{123};
+    using ramen::PullCast;
+    using ramen::Puller;
+    using ramen::PushCast;
+    using ramen::Pusher;
+    Latch<int>            latch{ 123 };
     PushCast<int, float>  push_cast;
     PullCast<double, int> pull_cast;
     Pusher<float>         push_trigger;
@@ -450,22 +429,20 @@ TEST_CASE("cast")
     REQUIRE(3.0 == *pull_trigger);
 }
 
-TEST_CASE("ctor")
-{
+TEST_CASE("ctor") {
     using ramen::Ctor;
     int        value = 0;
     const Ctor ctor  = [&value] { value = 123; };
-    (void) ctor;
+    (void)ctor;
     REQUIRE(123 == value);
 }
 
-TEST_CASE("finalizer")
-{
+TEST_CASE("finalizer") {
     using ramen::Finalizer;
     int value = 0;
     {
         const Finalizer fin1 = [&value] { value += 1; };
-        (void) fin1;
+        (void)fin1;
     }
     {
         Finalizer moved_into;
@@ -474,15 +451,15 @@ TEST_CASE("finalizer")
             Finalizer fin2 = [&value] { value += 10; };
             moved_into     = std::move(fin2);
         }
-        (void) moved_into;
+        (void)moved_into;
         REQUIRE(1 == value);
     }
     REQUIRE(11 == value);
     {
         Finalizer fin3 = [&value] { value += 222; };
-        fin3.disarm();  // Will not be invoked.
+        fin3.disarm(); // Will not be invoked.
     }
     REQUIRE(11 == value);
 }
 
-}  // namespace
+} // namespace

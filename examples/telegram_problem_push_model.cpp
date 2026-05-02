@@ -13,9 +13,7 @@
 #include <variant>
 
 /// The end tag is used to indicate that the input stream has ended.
-struct End final
-{
-};
+struct End final {};
 
 /// The decomposer is the input of the network. It accepts text, and pushes out individual words one by one.
 ///
@@ -23,32 +21,26 @@ struct End final
 ///          (string_view|End) │ Decomposer │ (string_view|End)
 ///           in_text ────────►│            ├────────► out_word
 ///                            └────────────┘
-struct Decomposer
-{
+struct Decomposer {
     ramen::Pusher<std::variant<std::string_view, End>> out_word{};
 
-    ramen::Pushable<std::variant<std::string_view, End>> in_text = [this](const std::variant<std::string_view, End>& in)
-    {
-        if (const auto* const txt = std::get_if<std::string_view>(&in))
-        {
-            std::string_view text = *txt;
-            while (!text.empty())
-            {
-                const auto pos = text.find_first_of(" \t\n");
-                if (pos == std::string_view::npos)
-                {
-                    out_word(text);
-                    break;
-                }
-                out_word(text.substr(0, pos));
-                text.remove_prefix(pos + 1);
-            }
-        }
-        else
-        {
-            out_word(std::get<End>(in));
-        }
-    };
+    ramen::Pushable<std::variant<std::string_view, End>> in_text =
+      [this](const std::variant<std::string_view, End>& in) {
+          if (const auto* const txt = std::get_if<std::string_view>(&in)) {
+              std::string_view text = *txt;
+              while (!text.empty()) {
+                  const auto pos = text.find_first_of(" \t\n");
+                  if (pos == std::string_view::npos) {
+                      out_word(text);
+                      break;
+                  }
+                  out_word(text.substr(0, pos));
+                  text.remove_prefix(pos + 1);
+              }
+          } else {
+              out_word(std::get<End>(in));
+          }
+      };
 };
 
 /// The aggregator accepts words one by one, and builds lines of text from them such that each line is as long as
@@ -58,34 +50,28 @@ struct Decomposer
 ///          (string_view|End) │ LineAggregator │ (string_view)
 ///           in_word ────────►│                ├────────► out_line
 ///                            └────────────────┘
-struct LineAggregator
-{
-    std::size_t line_length_limit{0};
+struct LineAggregator {
+    std::size_t line_length_limit{ 0 };
     std::string current_line{};
 
     ramen::Pusher<std::string_view> out_line{};
 
-    ramen::Pushable<std::variant<std::string_view, End>> in_word = [this](const std::variant<std::string_view, End>& in)
-    {
-        if (const auto* const word = std::get_if<std::string_view>(&in))
-        {
-            if (current_line.size() + word->size() >= line_length_limit)
-            {
-                out_line(current_line);
-                current_line.clear();
-            }
-            if (!current_line.empty())
-            {
-                current_line += ' ';
-            }
-            current_line += *word;
-        }
-        else
-        {
-            out_line(current_line);
-            current_line.clear();
-        }
-    };
+    ramen::Pushable<std::variant<std::string_view, End>> in_word =
+      [this](const std::variant<std::string_view, End>& in) {
+          if (const auto* const word = std::get_if<std::string_view>(&in)) {
+              if (current_line.size() + word->size() >= line_length_limit) {
+                  out_line(current_line);
+                  current_line.clear();
+              }
+              if (!current_line.empty()) {
+                  current_line += ' ';
+              }
+              current_line += *word;
+          } else {
+              out_line(current_line);
+              current_line.clear();
+          }
+      };
 };
 
 constexpr std::string_view sample_text_1 = R"===(
@@ -119,11 +105,11 @@ toolset in order to be able to “wire together” these software ICs. At the ve
 able to choose the wiring language independent of the chip language.
 )===";
 
-int main()  // NOLINT(bugprone-exception-escape)
+int main() // NOLINT(bugprone-exception-escape)
 {
     // Instantiate the actors.
     Decomposer     decomposer;
-    LineAggregator line_aggregator{80};
+    LineAggregator line_aggregator{ 80 };
 
     // Top-level ports: input text and output lines.
     ramen::Pusher<std::variant<std::string_view, End>> ingest_text;

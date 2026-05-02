@@ -1,14 +1,13 @@
 name: Style
 on: push
 env:
-  LLVM_VERSION: 19
+  LLVM_VERSION: 20
 jobs:
   style:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      # Check C++ formatting. We no longer use clang-format-lint-action because it is poorly maintained.
       - name: Clang-Format  # language=bash
         run: |
           wget -O llvm.sh https://apt.llvm.org/llvm.sh
